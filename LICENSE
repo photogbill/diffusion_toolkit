@@ -1,0 +1,67 @@
+ATK Diffusion Toolkit (diffusion_toolkit)
+
+Copyright (c) 2026 William R. Duncan. All rights reserved.
+
+
+1. NO LICENCE IS GRANTED
+
+This repository is made available so that its contents may be read. That is
+the only thing it is made available for.
+
+No licence, express or implied, is granted to any person or organisation to
+use, run, install, copy, modify, adapt, translate, merge, publish, distribute,
+sublicense, sell, or create derivative works from this software or any part of
+it. This applies to commercial and non-commercial purposes alike, to paid and
+unpaid use alike, and to individuals, companies, non-profit organisations,
+academic institutions, and government and military bodies alike.
+
+Obtaining a copy of this software does not grant permission to use it. That is
+true however the copy was obtained - by cloning or downloading this repository,
+by receiving a copy from someone else, or by any other means.
+
+
+2. HOW TO OBTAIN PERMISSION
+
+Permission must be requested from, and granted in writing by, the copyright
+holder. Each grant is specific to the recipient and to the use described in it,
+and confers nothing beyond what it states.
+
+Requests: william.r.duncan@hotmail.com
+
+
+3. COMPONENTS THAT ARE NOT PART OF THIS WORK
+
+This toolkit depends on separately licensed software that this repository does
+not contain and does not redistribute: PyTorch, TorchSig, ONNX Runtime, NumPy,
+SciPy and others, obtained from their own publishers at install time, each
+governed by its own licence terms. Model weights produced or downloaded by the
+toolkit are governed by the terms of the data and models they came from.
+Nothing above modifies, restricts or claims any right in any of them.
+
+One file is licensed differently, on purpose: `atk_diffusion/text/loop.py` is
+the host-side diffusion loop that this toolkit shares with Palimpsest (an MIT
+project by the same copyright holder; Palimpsest plan section 8.6). That file
+carries its own MIT notice and is MIT-licensed. Nothing else in this
+repository is.
+
+No copyleft (GPL or AGPL) code is linked into this work. Where a GPL program
+is useful it is run as a separate process and is fetched by its own installer
+from its own publisher, never vendored here.
+
+
+4. NO WARRANTY
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THIS SOFTWARE OR ITS USE OR OTHER DEALINGS.
+
+This toolkit is an analytical aid. Every learned output it produces - a
+detection, a classification, a denoised or repaired signal, a reconstructed
+track, a position posterior, a predicted coverage map, a vital-sign estimate -
+is a reconstruction or a proposal, not verified fact and not professional
+advice of any kind. Vital-sign estimates in particular are research-grade
+measurements and are not a medical device or a diagnosis. Outputs must be
+independently confirmed by a qualified person before being relied upon.

@@ -1,0 +1,75 @@
+# Copyright (c) 2026 William R. Duncan. All rights reserved. See LICENSE.
+#
+# itmlogic (MIT) is the NTIA Longley-Rice ITM for plan E5's reach map; it
+# needs only numpy.
+#
+# The ATK Diffusion Toolkit as an installable package (import name
+# atk_diffusion). Two environments use it (docs/ARCHITECTURE.md §1):
+#
+#   ATK's envs\atk_core     pip install <toolkit>[core]     numpy, scipy,
+#                           onnxruntime, tifffile — everything classical and
+#                           CPU inference of trained models
+#   envs\atk_diffusion or   pip install -e <toolkit>[train]  + PyTorch (install
+#   the toolkit's .venv     it FIRST from the CUDA index — install.bat does),
+#                           TorchSig 2.2.0, ONNX export
+#
+# NO CONSOLE SCRIPTS, on purpose: ATK's rule is `python -m …` always, never a
+# Scripts\*.exe shim (a shim bakes an absolute path into itself and breaks
+# when the folder moves). Run the command line as
+#     python -m atk_diffusion <command> …      (atkdiff.bat does exactly this)
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atk-diffusion"
+version = "0.1.0"
+description = "ATK Diffusion Toolkit: diffusion models and learned-RF tools for ATK (receiver profiles, synthetic data at the profile's rate, the AI signal detector, the signal cut, repair, maps)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [{name = "William R. Duncan"}]
+classifiers = [
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Intended Audience :: Science/Research",
+    "Topic :: Communications :: Ham Radio",
+    "Topic :: Scientific/Engineering",
+    "Private :: Do Not Upload",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+]
+
+[project.optional-dependencies]
+core = ["onnxruntime", "tifffile", "itmlogic"]
+train = [
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "torchsig==2.2.0",
+    "onnx",
+    "onnxruntime",
+    "tifffile",
+    "itmlogic",
+]
+text = ["transformers"]
+serial = ["pyserial"]
+
+[project.urls]
+Repository = "https://github.com/photogbill/diffusion_toolkit"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["atk_diffusion*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

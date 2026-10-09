@@ -1,0 +1,17 @@
+# Built by install.bat (the stand-alone setup) - never committed
+.venv/
+.pipcache/
+.tmp/
+
+# Python and test leftovers
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Data never lives in this repository: it goes to ..\rf_data (plan §3)
+rf_data/
+
+# The commit message a session drafts for ATK's push.bat (read, never kept)
+.git-commit-message.txt
