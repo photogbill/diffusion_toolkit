@@ -138,6 +138,14 @@ only inside `atk_diffusion.synth.torchsig_backend`. `onnxruntime` only inside
   `fresh_separate(x, fs, alpha_sets)` (blind adaptive FRESH / cyclic Wiener);
   `score(x_multi, fs, alpha)` (SCORE beamforming on the Kraken's five
   channels). Each returns the output and the MEASURED before/after SNR.
+- `cyclo.sift` (DETECTION_DESIGN §4.4, 2026-10-12): the deep scan for
+  signals below the floor. `parse_stops` (the operator's list), `SiftConfig`
+  → `make_plan` → `SiftPlan.words()` (said before the run); `search` — blind,
+  segmented (Gamma(K) null, derived threshold), at channel widths a factor
+  of 4 apart cut by the proposer's channelizer; `Ledger` (receiver · dc ·
+  local · background · visible · explained · new); `DwellStore` (dwells
+  written, held, kept as SigMF or deleted), `SiftSchedule`, `decide`,
+  `SiftLog`. Driven by ATK's RF / Radio → Sift.
 - `dsp.measure`: occupied bandwidth, SNR above floor, symbol rate and
   carrier offset from the cyclic profile, burst length, PRI, duty —
   classical, checkable.

@@ -18,6 +18,7 @@
 4.1 Cyclostationary processing — a detector, a representation, a measurement
 4.2 The signal cut — right-click to everything
 4.3 Low-SNR escalation — the buffer, and filtering with what the cyclic detector found
+4.4 Sifting — the deep scan for signals below the noise floor (LPI / LPD)
 5. Stage 3 — tracks and confirmation
 6. Training — pretrain on real, supervise on synthetic, fine-tune on cabled
 7. Deployment — ONNX on the CPU
@@ -352,6 +353,148 @@ against the classical three on the same cuts.
 cleaned cut, flagged *post-clean*; a classification that appears only
 after cleaning is shown with that flag, never silently promoted.
 
+## 4.4 Sifting — the deep scan for signals below the noise floor (LPI / LPD)
+
+Bill, 2026-10-12: *"an automated 'sifting' mode that is specifically for
+looking for and automatically recording signals below the noise floor. Its
+an LPI/LPD detector. The Operator would set a bandwidth and a list of
+frequencies to hop through, and it would take long listens looking for
+signals … As our deep scan I guess. I assume we would need it to
+automatically engage a longer buffer to ensure it could record any
+detections."* This is the *deep scan* §4.1 promised ("an unknown rate is
+found only by a full scan") and never built. Engine
+`atk_diffusion/cyclo/sift.py`; in ATK, RF / Radio → **Sift**
+(`atk/ui/sift_page.py`, threads in `atk/core/sift_worker.py`).
+
+**What is different from the cyclic proposer.** The proposer (§3) tests
+the symbol rates and prefix lags the class table lists, and nothing else.
+Sifting is **blind**: every cycle frequency from a few hertz to the
+channel's width, at several channel widths, conjugate and non-conjugate.
+It promises "a modulated signal with a clock at α is here, at this
+frequency" — the only finding an LPI search can promise — and leaves the
+naming to the cut (§4.2) and the classifier.
+
+**The five decisions.**
+
+1. **Record first, decide after.** A detection exists only at the END of a
+   dwell, so a buffer engaged on a detection is always too late: the
+   buffer IS the recording. Every dwell is written to disk as it arrives,
+   in the radio's own bytes, under `rf_data\<profile>\runs\sifts\<run>\`
+   (never C:\, never the user profile); the search runs on the file; a
+   dwell with nothing new is deleted. One with something NEW is **held**
+   while the same stop is listened to again; both are **kept** — as SigMF
+   pairs in `captures\sift\<run>\`, one annotation per feature — only if
+   the second look reproduces it. Two independent looks square the
+   false-alarm probability and give a longer recording of anything real.
+   The second look asks only "is THAT line still here?": inside each held
+   line's window its threshold is set by the cells in the windows alone
+   (thousands, not millions), and a carrier may have moved up to 0.5 ppm
+   between looks (both oscillators drift; an α bin is a few parts per
+   billion at RF). The disk budget covers every sift with that radio, and
+   a first look and its confirmation are kept together or not at all.
+   A full queue or a gap reported by the radio ENDS the dwell (said, and
+   the stop done again); bytes are never dropped from a recording's middle.
+2. **Segmented integration, a derived threshold.** Coherent integration
+   pays only while a feature stays in one α bin (1/T); clock and LO drift
+   end that within seconds, so a dwell is cut into coherent segments
+   (default 2 s) whose lag-domain statistics are **summed**. Per segment,
+   per α bin, per lag the statistic is exponential under the null, so the
+   sum of K is **Gamma(K, 1)** after the local-median (CFAR-in-α)
+   normalisation, and the threshold is `gammainccinv(K, Pfa / trials)` with
+   every channel, resolvable α cell and lag counted (Bonferroni). Measured
+   on noise through the real channelizer: mean 4.999 and variance 4.999
+   for K = 5, tail rates 9.98·10⁻³ / 1.05·10⁻³ / 1.21·10⁻⁴ at nominal
+   10⁻² / 10⁻³ / 10⁻⁴. Coherently, each doubling of dwell buys ~1.5 dB;
+   past the segment length ~0.75 dB.
+3. **Several channel widths.** Cyclic sensitivity is set by IN-BAND SNR,
+   so a narrow signal searched inside a wide channel loses √(W/B). The
+   stop is resampled once to 2.5× its bandwidth (a rational polyphase
+   resampler, so the cost follows the bandwidth, not the radio: a bladeRF
+   at 4 MS/s and a HackRF at 20 MS/s both search a 1 MHz stop at
+   2.5 MS/s), the widest level filtered directly and the narrower ones cut
+   by the proposer's WOLA channelizer at widths a factor of 4 apart (the bandwidth, ÷4, ÷16, …,
+   down to 12.5 kHz), half-overlapping, each channel sampled at 2.5× its
+   width — the margin that keeps a transition-band carrier's conjugate
+   line from aliasing into the searched |α| ≤ width (measured otherwise:
+   a BPSK at +93.75 kHz reappeared in the channel at 0 Hz, aliased to
+   −145.8 kHz). Conjugate lines are matched by their **absolute carrier**
+   (channel centre + α/2), never by α, which depends on the channel. A
+   rate is merged within one width first (overlapping channels: one run,
+   their union its place) and only then across widths, so a wide channel
+   cannot chain separate emitters together; a harmonic is folded into a
+   rate only when it is seen inside that rate's place.
+4. **The environment is the real false-alarm source.** Below the floor a
+   blind search finds every periodic thing nearby. The threshold controls
+   chance only; every feature is therefore classified, first match wins:
+   **receiver** (learned with the antenna replaced by a 50 Ω terminator,
+   per receiver profile, matched by offset from the tuned centre; saved
+   only by a calibration that finished every dwell — a cancelled one keeps
+   the stored calibration) · **dc** (a carrier line at the tuned centre —
+   the radio's DC offset looks the same) · **local** (the same α at three
+   or more stops further apart than the bandwidth: one wideband emitter
+   fills many narrow channels of ONE stop and is not local by itself) ·
+   **background** (seen at that stop during the baseline pass; carriers
+   matched within 2 ppm, hours of drift) ·
+   **visible** (channel SNR ≥ 0 dB and measurably so — at or above the
+   floor is what the waterfall shows; a perfect radiometer over a dwell of
+   white noise "measures" −15 dB, which no waterfall shows) · **explained**
+   (α matches a class-table rate or harmonic) · **new**. Only NEW is
+   recorded by default; nothing is hidden — every class is listed on the
+   Sift page in its own colour (gold for new and kept, muted for what the
+   place and the radio explain).
+5. **False recordings per day, not a Pfa.** The operator says how many
+   false recordings a day chance may cause; with confirmation, F = D·p₁·p₂
+   for D dwells a day, split evenly, the first look capped at 2 % (each
+   false first look costs one confirmation dwell).
+
+**Before it starts, it says what it will do** (`SiftPlan.words`): the
+revisit time; the segments and widths; the sensitivity — a measured κ
+scaled by the algebra (K·κ·L·η = t − K + z₀.₉√K): for 1 MHz stops of a
+4 MS/s bladeRF, 30 s dwells, a QPSK-like (RRC 0.35) symbol-rate line
+filling its channel is found to about −20 dB in-band SNR in a 1 MHz
+channel and −11 dB in a 15.6 kHz one, and a BPSK-like carrier line about
+6 dB deeper; the expected false recordings and confirmation dwells a day;
+the disk a dwell takes and the memory the analysis needs (every width the
+machine searches at once, counted together — an upper bound); and, measured on
+the machine (one segment of noise through the real search), the analysis
+time — when it is longer than the dwell, it sets the pace and the plan
+says so.
+
+**The schedule.** Stops in order; a NEW finding queues a confirmation of
+that stop at the front; a near miss (family p < 0.1) earns one relook per
+stop per pass; the hopper waits while two dwells wait for analysis. The
+first pass (configurable, 0–5) learns the place. **Calibrate** listens
+with the terminator fitted at up to three of the stops. A retune the RF
+panel refuses is said and skipped (a whole list refused ends the run); a
+driver that confirms a retune late has the dwell restarted and its wait
+raised; the radio's stream taken away (Stop on the Spectrum page) ends the
+run within a second; and a result that arrives after its run ended counts
+against nothing. Every hop,
+dwell, analysis and decision is a line in the run's `sift_log.jsonl`, and
+ATK's own log (`atk.sift`) carries the same at INFO.
+
+**What it cannot do** (`sift.LIMITS`, said on the page): a burst shorter
+than a few hundred symbols leaves no line; a frequency hopper is seen only
+in the fragments that land at a stop while it is listened to (bandwidth
+beats a hopper, not dwell); a waveform built without cyclic features —
+dithered timing, noise-like spreading — can hide from it, and against that
+only a carefully calibrated radiometer helps. A signal filling only part
+of a channel scores less than the reference (measured: a third of a
+channel, about half the matched κ); the levels exist so some channel is
+within a factor of 4 of every signal.
+
+**Reviewed** (2026-10-12) by an agent that had not seen it written: nine
+defects, each fixed and pinned by a test (`tests/test_cyclo_sift.py` §9,
+ATK's `tests/test_sift_page.py`). The one physics limit it measured stays:
+a carrier drifting WITHIN a dwell loses margin (13.9 → 4.8 for 4 Hz over
+4 s) — shorter coherent segments are the answer, and the plan says so.
+
+**Next, not built:** accumulating a persistent emitter's statistics across
+revisits (incoherent, so hours of total listening count); drawing a kept
+finding's box on the waterfall when the radio is back on its stop; and on
+the KrakenSDR, SCORE (§4.3) pointed at a finding's α for a bearing on an
+emitter the waterfall cannot show.
+
 ## 5. Stage 3 — tracks and confirmation
 
 **Tracker.** Boxes from successive tiles are associated (Hungarian
@@ -497,6 +640,10 @@ and out.
    demodulator; a FRESH filter (clean and separate); SCORE on Kraken cuts
    (§4.3). Each with measured before/after SNR on synthetic cuts at known
    SNR, then on cabled captures.
+2d. Sifting — the deep scan (§4.4): blind segmented search at several
+   widths, the ledger, record-first dwells with confirmation, the plan in
+   words; RF / Radio → Sift in ATK. Built 2026-10-12; the null, κ and the
+   sensitivity model are held to the engine by `tests/test_cyclo_sift.py`.
 3. Labels: SigMF annotation read/write; TorchSig ↔ SigMF conversion.
 4. Datasets: TorchSig synthetic at the profile's rate with its impairments;
    one cabled set (plan §3.5).
@@ -634,3 +781,9 @@ same box. So:
   colours, confirmation is a solid heavier edge with the source badges
   kept; one pulse on first appearance; a legend. ✅ Bill's requirement,
   2026-10-08; the scheme, Claude.
+- **D14 — Sifting** (§4.4): an operator's frequency list and bandwidth,
+  long listens, a blind cyclostationary search with a derived threshold,
+  every dwell recorded and kept only if something NEW is in it and is
+  seen again; the environment classified, not thresholded. ✅ Bill's idea,
+  2026-10-12 (*"an LPI/LPD detector … as our deep scan"*); the design,
+  Claude.
