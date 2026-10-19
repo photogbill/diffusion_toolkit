@@ -378,13 +378,13 @@ def test_wideband_scenes_tiles_and_boxes(rf):
 
 
 def test_wideband_for_bills_region(rf):
-    m = D.build_wideband(rf, PID, "va", 1, env="us-va-nokesville",
+    m = D.build_wideband(rf, PID, "va", 1, env="us-rural",
                          scene_seconds=0.05, compute_tiles=False)
-    assert m["environment"] == "us-va-nokesville"
+    assert m["environment"] == "us-rural"
     assert m["tiles"] == "not computed: compute_tiles=False"
     assert "a prior, not the place" in m["notes"][0]
     sc = next(D.iter_shards(m["path"], "train"))
-    assert sc["meta"]["global"]["atk:environment"] == "us-va-nokesville"
+    assert sc["meta"]["global"]["atk:environment"] == "us-rural"
     assert sc["tiles"] is None
 
 

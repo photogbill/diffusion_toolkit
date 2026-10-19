@@ -53,13 +53,13 @@ def test_a_generator_label_round_trips_through_an_annotation():
     from atk_diffusion.synth import native
     _, lab = native.generate("dmr", 2.4e6, 120_000, 14.0, np.random.default_rng(1),
                              carrier_offset_hz=250e3)
-    ann = labels.label_to_annotation(lab, 162e6, environment="us-va-nokesville")
+    ann = labels.label_to_annotation(lab, 162e6, environment="us-rural")
     d = ann.to_sigmf()
     assert d["core:label"] == "dmr" and d["atk:source"] == "synthetic"
     assert d["atk:generator"] == "native" and d["atk:family"] == "fsk"
     assert d["core:freq_lower_edge"] == pytest.approx(162e6 + lab["f_lo_hz"])
     assert d["atk:symbol_rate"] == 4800.0 and d["atk:snr_db"] == 14.0
-    assert d["atk:environment"] == "us-va-nokesville"
+    assert d["atk:environment"] == "us-rural"
     assert len(d["atk:bursts"]) == len(lab["bursts"])
     assert sigmf.validate({"global": {"core:datatype": "cf32_le",
                                       "core:sample_rate": 2.4e6,

@@ -63,7 +63,7 @@ def _label(**kw):
 def test_label_to_annotation_carries_every_number():
     lab = _label(clipped=True, torchsig_class="dmr", torchsig_snr_db=15.0,
                  torchsig_edges=(16e3, 24e3))
-    a = LB.label_to_annotation(lab, 462e6, environment="us-va-nokesville",
+    a = LB.label_to_annotation(lab, 462e6, environment="us-rural",
                                sample_offset=50, extra={"atk:dataset": "x"})
     d = a.to_sigmf()
     assert d["core:sample_start"] == 150 and d["core:sample_count"] == 5000
@@ -71,7 +71,7 @@ def test_label_to_annotation_carries_every_number():
     assert d["core:label"] == "dmr"
     assert d["atk:source"] == "synthetic" and d["atk:generator"] == "native"
     assert d["atk:snr_db"] == 12.346 and d["atk:symbol_rate"] == 4800.0
-    assert d["atk:environment"] == "us-va-nokesville" and d["atk:clipped"] is True
+    assert d["atk:environment"] == "us-rural" and d["atk:clipped"] is True
     assert d["atk:torchsig_class"] == "dmr" and d["atk:torchsig_snr_db"] == 15.0
     assert d["atk:torchsig_edges"] == [462e6 + 16e3, 462e6 + 24e3]
     assert d["atk:bursts"] == [[0, 2000], [3000, 2000]]
@@ -131,7 +131,7 @@ def _ts_meta(**kw):
 
 def test_torchsig_to_annotation_infers_the_class_and_keeps_torchsigs_numbers():
     a = LB.torchsig_to_annotation(_ts_meta(), sample_rate=2.4e6, center_hz=98e6,
-                                  environment="us-va-nokesville",
+                                  environment="us-rural",
                                   extra={"atk:dataset": "d"})
     d = a.to_sigmf()
     assert d["core:label"] == "fm_broadcast"
@@ -140,7 +140,7 @@ def test_torchsig_to_annotation_infers_the_class_and_keeps_torchsigs_numbers():
     assert d["atk:torchsig_edges"] == [98e6 - 50e3, 98e6 + 150e3]
     assert d["core:freq_lower_edge"] == 98e6 - 50e3     # TorchSig's own box
     assert "atk:snr_db" not in d                         # a different quantity
-    assert d["atk:environment"] == "us-va-nokesville" and d["atk:dataset"] == "d"
+    assert d["atk:environment"] == "us-rural" and d["atk:dataset"] == "d"
 
 
 def test_torchsig_to_annotation_with_the_toolkits_own_measurements():

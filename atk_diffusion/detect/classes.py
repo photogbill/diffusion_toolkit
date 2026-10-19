@@ -13,7 +13,7 @@ private idea of what DMR is:
 * the waterfall caption takes the class's ATK TECHNOLOGY key, so a detected
   DMR box is DMR's orange — the colour ATK has always used for DMR.
 
-What Bill can capture around Nokesville and make with his own hardware, plus
+What Bill can capture around his home station and make with his own hardware, plus
 what TorchSig can synthesise. The field adds the rest through *teach*.
 Nothing here depends on samples Bill cannot get (no CSAR radios — plan change
 log, 2026-10-08).

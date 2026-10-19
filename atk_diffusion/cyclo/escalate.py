@@ -27,7 +27,7 @@ WHY A BUFFER. The cyclic detector is the one proposer whose depth grows with
 observation time: its statistic's mean grows in proportion to the time
 integrated (the SCF estimate's variance falls as 1/(T·Δf)), while a tile is
 one second. Seconds of buffer find what no tile can — the tests show a
-cell 12 dB under the floor that one second misses and the buffer finds.
+cell 13 dB under the floor that one second misses and the buffer finds.
 
 THE TRIGGER A WEAK SIGNAL CAN PULL. A signal under the CFAR line makes no
 energy box, so no box-driven trigger can ever fire for it; that is what the

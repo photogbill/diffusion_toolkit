@@ -17,7 +17,8 @@ falling with distance) so the whole path runs; a synthetic table is labelled
 synthetic. Without voacapl, every predicted cell says "prediction
 unavailable" in words — the measured half still stands on its own.
 
-HERE defaults to the 4-character square FM18 (northern Virginia); the three
+HERE defaults to the illustrative 4-character square EM29 (central US; set
+your own with --here); the three
 default Kiwi regions are illustrative grid squares, to be replaced by the
 Kiwis Bill chooses.
 """
@@ -37,7 +38,7 @@ from atk_diffusion.hf import maidenhead as _mh
 from atk_diffusion.hf import openness as _op
 from atk_diffusion.hf import wspr as _wspr
 
-HERE_GRID = "FM18"
+HERE_GRID = "EM29"
 DEFAULT_KIWIS = ({"name": "England", "grid": "IO91"},
                  {"name": "Colorado", "grid": "DM79"},
                  {"name": "Puerto Rico", "grid": "FK68"})

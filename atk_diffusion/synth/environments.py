@@ -17,8 +17,9 @@ scored: the domain gap between a detector trained on a composed region and the
 first minutes on site (plan §7, *minutes to acceptable*) is the number that
 says how good the prior was. The `caveat` field says so on every profile.
 
-WHAT IS AND IS NOT IN THE BUILT-IN PROFILE. `builtin("us-va-nokesville")` —
-Bill's own area — is built from well-known US allocations (47 CFR §2.106 and
+WHAT IS AND IS NOT IN THE BUILT-IN PROFILE. `builtin("us-rural")` — a
+generic rural United States prior (renamed 2026-10-16 from a place-named id,
+ATK delivery checklist P1) — is built from well-known US allocations (47 CFR §2.106 and
 the service rules cited per entry) and from ATK's own LTE and NR band tables
 (`atk/core/lte_bands.py`, 3GPP TS 36.101 Table 5.5-1; `atk/core/nr_bands.py`,
 TS 38.104 Table 5.2-1 — their US downlink rows are copied below, and a test
@@ -251,11 +252,11 @@ def resolve(rf, env) -> EnvironmentProfile:
     if isinstance(env, str):
         return load(rf, env) if rf is not None else builtin(env)
     raise EnvironmentError("an environment is an EnvironmentProfile or a "
-                           "region id such as 'us-va-nokesville'")
+                           "region id such as 'us-rural'")
 
 
 # ---------------------------------------------------------------------------
-# the built-in prior for Bill's area
+# the built-in prior: rural United States
 # ---------------------------------------------------------------------------
 #: US downlink rows of ATK's atk/core/lte_bands.py (_RAW, REGIONS["US"]):
 #: (band, mode, dl_low MHz, dl_high MHz). Copied, not imported (ATK is not a
@@ -281,7 +282,7 @@ US_NR_DL = (
 _LMR = ["nfm_voice", "dmr", "p25", "nxdn96", "nxdn48"]
 
 
-def _us_va_nokesville() -> EnvironmentProfile:
+def _us_rural() -> EnvironmentProfile:
     A = Allocation
     allocs = [
         A(88.0 * M, 108.0 * M, "FM broadcast", ["fm_broadcast"], 0.45,
@@ -365,21 +366,21 @@ def _us_va_nokesville() -> EnvironmentProfile:
          "notes": "illegal, mobile, rare"},
     ]
     return EnvironmentProfile(
-        region="us-va-nokesville",
-        label="Nokesville, Virginia (Prince William County)",
+        region="us-rural",
+        label="United States, rural (generic US allocations)",
         itu_region=2, country="US", allocations=allocs, cellular_bands=cells,
         broadcasters=broadcasters, terrain_class="rural",
         channel_model=dict(TERRAIN_CHANNELS["rural"]),
         interference=interference,
-        notes=["semi-rural, rolling terrain; suburban toward Manassas and "
-               "Bristow — 'rural' is the prior's terrain class",
+        notes=["semi-rural, rolling terrain near a large metro market — "
+               "'rural' is the prior's terrain class",
                "allocations from the US table; no operator, station, tower or "
                "channel assignment is asserted",
                "cellular downlink bands copied from ATK's own LTE/NR tables"],
         source="toolkit built-in prior, 2026-10-08")
 
 
-BUILTIN = {"us-va-nokesville": _us_va_nokesville}
+BUILTIN = {"us-rural": _us_rural}
 
 
 def builtin(region: str) -> EnvironmentProfile:

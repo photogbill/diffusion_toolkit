@@ -27,7 +27,7 @@ SNAPSHOT = Path("/home/claude/atk_snapshot/atk/core")
 
 @pytest.fixture(scope="module")
 def env():
-    return E.builtin("us-va-nokesville")
+    return E.builtin("us-rural")
 
 
 # -- the environment profile ---------------------------------------------------------
@@ -88,14 +88,14 @@ def test_cellular_rows_are_atks_own_tables(env):
 
 def test_save_load_and_refusals(rf, env):
     p = E.save(rf, env)
-    assert p == rf.environments_dir() / "us-va-nokesville.json"
+    assert p == rf.environments_dir() / "us-rural.json"
     assert rf.verify(p)[0]
-    back = E.load(rf, "us-va-nokesville")
+    back = E.load(rf, "us-rural")
     assert back.to_json()["allocations"] == env.to_json()["allocations"]
-    assert E.list_environments(rf) == ["us-va-nokesville"]
+    assert E.list_environments(rf) == ["us-rural"]
     with pytest.raises(E.EnvironmentError, match="no environment profile 'mars'"):
         E.load(rf, "mars")
-    bad = E.builtin("us-va-nokesville")
+    bad = E.builtin("us-rural")
     bad.allocations[0].classes.append("smoke_signals")
     with pytest.raises(E.EnvironmentError, match="not in the class table"):
         E.save(rf, bad)
@@ -147,7 +147,7 @@ def test_an_fm_band_scene_has_stations_on_the_raster_and_holds_its_energy(env):
     assert fm, "no stations"
     for a in r.annotations:
         d = a.to_sigmf()
-        assert d["atk:environment"] == "us-va-nokesville"
+        assert d["atk:environment"] == "us-rural"
         assert d["atk:source"] == "synthetic" and "atk:snr_db" in d
         assert fc - fs / 2 - 1 <= d["core:freq_lower_edge"] < d["core:freq_upper_edge"] \
             <= fc + fs / 2 + 1

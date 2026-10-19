@@ -2739,7 +2739,7 @@ def _add_experiment_parsers(sub, common) -> None:
 
     p = exp("hf")
     p.add_argument("--spots", nargs="*", default=None, help="ALL_WSPR.TXT-style files")
-    p.add_argument("--here", default="FM18", help="your Maidenhead square")
+    p.add_argument("--here", default="EM29", help="your Maidenhead square (default: an illustrative central-US square)")
     p.add_argument("--kiwi", action="append", default=None, help="NAME:GRID, repeatable")
     p.add_argument("--bands", default="80m,40m,30m,20m")
     p.add_argument("--hours", default="20,21,22,23,0,1,2,3", help="UTC hours")
@@ -2878,7 +2878,7 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--profile", required=True)
     v.add_argument("--name", required=True)
     v.add_argument("--scenes", type=int, required=True)
-    v.add_argument("--env", default=None, help="an environment profile, e.g. us-va-nokesville")
+    v.add_argument("--env", default=None, help="an environment profile, e.g. us-rural")
     v.add_argument("--seconds", type=float, default=None, help="scene length (default: a tile)")
     v.add_argument("--classes", default=None, help="comma list (default: all)")
     v.add_argument("--generator", default="native", choices=("native", "torchsig"))

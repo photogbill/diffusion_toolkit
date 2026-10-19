@@ -67,10 +67,10 @@ sheet — never from memory:
 
     atkdiff.bat synth throughput --profile rtlsdr_2400000_cu8
     atkdiff.bat synth narrowband --profile rtlsdr_2400000_cu8 --name nb1 --classes nfm,dmr,p25,pocsag,lora --n-per-class 2000 --generator torchsig
-    atkdiff.bat synth wideband   --profile rtlsdr_2400000_cu8 --name wb1 --scenes 500 --env us-va-nokesville
+    atkdiff.bat synth wideband   --profile rtlsdr_2400000_cu8 --name wb1 --scenes 500 --env us-rural
 
 `--generator native` uses the built-in numpy generator instead of TorchSig
-(same labels, no TorchSig needed). `--env us-va-nokesville` composes scenes
+(same labels, no TorchSig needed). `--env us-rural` composes scenes
 from the US allocation tables and the Virginia cellular band plan — *a
 prior, not the place*.
 
@@ -105,7 +105,7 @@ and put the splitter loss in (`--splitter-loss-db`, `--splitter-ways 5`).
 
     atkdiff.bat experiment domain-gap --profile rtlsdr_2400000_cu8 --model <trained model> --synthetic-dataset wb1 --cabled-dataset cab1
 
-**Environment version (§3.6):** train on `--env us-va-nokesville` scenes,
+**Environment version (§3.6):** train on `--env us-rural` scenes,
 record a few minutes from the yard as an on-site dataset, then
 
     atkdiff.bat experiment minutes --profile rtlsdr_2400000_cu8 --model <model> --onsite-dataset <yard dataset>

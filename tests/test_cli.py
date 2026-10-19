@@ -239,7 +239,7 @@ def test_synth_narrowband_list_and_throughput(run, rf):
 def test_synth_wideband_for_bills_region(run, rf):
     code, out, _ = run("synth", "wideband", "--profile", PID, "--name", "wb",
                        "--scenes", "1", "--seconds", "0.1", "--env",
-                       "us-va-nokesville", "--no-tiles")
+                       "us-rural", "--no-tiles")
     assert code == 0, out
     assert "Dataset wb (wideband)" in out and "a prior, not the place" in out
     from atk_diffusion.detect import classes

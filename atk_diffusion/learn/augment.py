@@ -44,7 +44,7 @@ own minimal versions, so no experiment here depends on them:
   4FSK, ADS-B squitter, LoRa chirps, BPSK/QPSK, GFSK, OFDM, CW, LFM chirp,
   OOK, band-limited noise, and an 8-FSK the denoiser is NOT trained on.
   Everything Bill can make with his own bladeRF or capture around
-  Nokesville; nothing needs a CSAR survival radio (plan change log).
+  his home station; nothing needs a CSAR survival radio (plan change log).
 * `burst(...)` places one in a window at a frequency offset, with its
   occupied bandwidth MEASURED (99 % power), not assumed.
 * `LocalReceiver` — thermal floor, front-end droop and ripple (the floor
