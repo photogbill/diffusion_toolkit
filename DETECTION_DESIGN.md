@@ -5,7 +5,7 @@
 
 | | |
 |---|---|
-| **Status** | Design 2026-10-08; **built 2026-10-09** — every build step in §12 and the on-screen design of §12.1–12.2 (in ATK). The learned parts are trained on Bill's GPU from his datasets; `docs/BUILD_STATUS.md` says what is measured. Companion to `ATK_DIFFUSION_PLAN.md` (tracks A, B, C3, B5, B6); this file is the detector in detail. |
+| **Status** | Design 2026-10-08; **built 2026-10-09** — every build step in §12 and the on-screen design of §12.1–12.2 (in ATK). The learned parts are trained on Bill's GPU from his datasets; `docs/BUILD_STATUS.md` says what is measured. Companion to `ATK_DIFFUSION_PLAN.md` (tracks A, B, C3, B5, B6); this file is the detector in detail. §4.5 (audio ID) and §4.6 (radio-astronomy search methods) were planned 2026-10-28 and are not built. |
 | **Goal** | On the live or recorded waterfall, at a receiver profile's exact rate, find every signal (where, when), say what it is (what), measure it (how), and hand what can be decoded to a decoder — on a laptop whose GPU the language model is also using, with an honest *unknown* and an honest confidence. |
 | **Constraints** | Receiver profiles and the sample-rate law (plan §3) · the Invented tier: a detection is *Proposed* until confirmed (plan §2.1) · runs beside the cognitive core, so real-time inference is **CPU** (ATK's embedders-on-CPU rule, extended) and the GPU is for training · all rights reserved: no copyleft linked in (§8). |
 
@@ -19,6 +19,8 @@
 4.2 The signal cut — right-click to everything
 4.3 Low-SNR escalation — the buffer, and filtering with what the cyclic detector found
 4.4 Sifting — the deep scan for signals below the noise floor (LPI / LPD)
+4.5 Audio ID — identify by how it sounds (planned)
+4.6 Weak-signal search methods from radio astronomy (planned)
 5. Stage 3 — tracks and confirmation
 6. Training — pretrain on real, supervise on synthetic, fine-tune on cabled
 7. Deployment — ONNX on the CPU
@@ -495,6 +497,288 @@ finding's box on the waterfall when the radio is back on its stop; and on
 the KrakenSDR, SCORE (§4.3) pointed at a finding's α for a bearing on an
 emitter the waterfall cannot show.
 
+## 4.5 Audio ID — identify by how it sounds (planned, optional, last to run)
+
+Bill, 2026-10-28: *"I think it should be an optional method, only to be
+used with signals with clear audio characteristics as it can help identify
+a noisy signal via sound. But its definitely one of the last detectors to
+hit."* His long-held idea behind it: operators identify a great many
+signals by ear, so an AI that listens should augment the
+spectrogram-based detectors.
+
+**Status: planned 2026-10-28, not built.** To be built after the RFMLS
+Training tab work (Setup → RFMLS Training; `library`, ARCHITECTURE §4.6)
+settles. Nothing in this section exists in code yet.
+
+**What it adds — and what it does not.** The audio is a demodulated,
+narrowed view of the I/Q the classifier already has, so it carries no new
+information. What it adds is a different *representation*: an ear-like,
+multi-resolution view of timing and tone — symbol-rate buzz, burst rhythm,
+FSK warble, sync and tone squelch, the texture of analog voice — which a
+single-resolution tile blurs. Part of that (symbol rate, frame rate) the
+cyclic profile (§4.1) already measures; the tonal and voice texture
+nothing else in the chain looks at. Its second gift is access to
+audio-domain models and to audio-only recordings (open decision below).
+
+**Where it sits.** Not a proposer: it never finds a signal, it only
+re-identifies a box something else drew. The chain: energy/CFAR proposes →
+the learned detector boxes → the classifier labels (§4) → *if the
+classifier is unsure*, audio ID (this section) and cyclostationary
+escalation (§4.3) run, each on its own trigger → a decoder confirms (§5).
+
+**Triggers — all three, or it does not run.**
+
+1. The classifier is unsure: its confidence is in the ambiguous band, or
+   the nearest prototype is near its threshold (§4).
+2. A candidate class is **audio-capable** (below).
+3. The box's SNR is above the measured demod floor for the mode (below).
+
+The analyst can also ask for it from the box's right-click menu. Off by
+default; a box in *AI Detect* turns it on.
+
+**Audio-capable is a per-type flag the grades must earn.** `type.json`
+gains `audio` (default false), set by the operator for types with a real
+sound. A flagged type is trained with and without the audio stage on the
+same real examples — the same mechanism as `compare_generated` — and if the
+stage does not raise the grade on the kept-aside real originals, it stays
+off for that type and the tab says so with the two numbers.
+**Voice-width types only** (`canonical == "voice"`). Wideband and very
+wide types play back as hiss, and their burst cadence is already the
+cyclic detector's job.
+
+**The demod recipe is locked, like the sample rate.** Several demods run
+side by side on the cut — AM envelope, FM discriminator, USB — each with a
+fixed filter, AGC and audio rate. The audio rate is an integer decimation
+of the voice-class canonical rate (48 kHz / 3 = 16 kHz on the RTL; 50 kHz
+/ 3 ≈ 16.7 kHz on the bladeRF and HackRF); a model that needs exactly
+16 kHz gets one fractional resample, written into the recipe. The whole
+recipe goes into the model card, and a recipe mismatch is a refusal, the
+same as a profile mismatch.
+
+**Training — from the same library, with the same honesty.** Every example
+in the RFMLS library yields its audio on the fly; the I/Q stays the one
+record. Roles carry over: audio from a kept-aside original is kept aside;
+audio from an AI-generated copy trains and never grades; the tier follows
+the parent. Any cache lives under the receiver's `rf_data` folder, never
+C:\ or AppData. First model: a small log-mel CNN per profile, ONNX on the
+CPU (D4). A pretrained audio encoder is a candidate to try against it with
+the same with/without comparison — weights fetched by the installer so it
+runs offline, and its license checked against §8 first.
+
+**Its floor.** It beats noise by hearing a pattern repeat over seconds, so
+it runs on the §4.3 ring buffer (3–5 s to start; the right length is
+measured), not on a tile. Below the demod threshold it fails — FM hardest,
+because the discriminator turns to hiss — so each mode's floor is measured
+on the library's *Harsh* dirty copies (accuracy against SNR) and the stage
+declines to run below it. Below that floor is §4.3's and Sift's (§4.4)
+territory.
+
+**Its weight.** An opinion, never a confirmation. On the box: a `♪` badge
+with the mode (e.g. `♪ FM: DMR`) in a fourth source colour, chosen by the
+same search as §12.2 (not picked yet). Agreement with the classifier raises
+the box's confidence; disagreement is shown as disagreement and logged, and
+neither wins — a decoder does (§5).
+
+*Where:* AI Detect → **Audio ID**.
+
+> **Hover:** "Identifies a signal by how it sounds once demodulated — the
+> way an operator does by ear. It only runs when the AI is unsure and the
+> signal is strong enough to demodulate. **Use it when** a type with a
+> clear sound (voice, FSK tones, digital-voice buzz) keeps coming up as
+> unsure. **How:** tick the box; it listens to a few seconds of the buffer
+> and adds a ♪ badge saying what it heard. It is an opinion — a decoder
+> still has the final word. **Not for** wide signals (LTE, Wi-Fi), which
+> only sound like hiss."
+
+**Logging.** Every trigger, recipe, verdict and timing at INFO on its own
+logger, and into the cut folder when it ran on a cut.
+
+**Open decision — Bill's call.** Audio-only recordings from other receivers
+(signal-ID reference libraries, other operators' recordings) can train only
+this stage. After demodulation the receiver matters less, but not zero, and
+using them bends the per-receiver rule (plan §3). Options: (a) own receivers
+only; (b) allowed as a separate, labelled source (`atk:source =
+outside_audio`) that trains and never grades. Not decided.
+
+## 4.6 Weak-signal search methods from radio astronomy (planned)
+
+Bill, 2026-10-28: *"What other radio astronomy techniques can we
+incorporate? … it seems like the ideal place to fish for methods of finding
+or recording / processing low powered hard to see signals."* And on the
+shortlist: *"I think the ones that you recommend, we should add. Even if
+they are only for specific scenarios, just make sure that when they hover
+over that option, that text appears explaining when and how it should be
+used."*
+
+**Status: planned 2026-10-28, not built.** The kernels are atkdsp's Part C
+(`atkdsp/docs/DSP_EXPANSION_PLAN.md`, C1–C6). The Kraken-side items —
+null-and-DF-again, self-calibration, aircraft as calibrators — are
+`atkdf/docs/ATKDF_PLAN.md` §13; passive radar's use is
+`atkpr/docs/ATKPR_PLAN.md` §6A.18. This section is how the detector and
+Sift use them and what the operator sees.
+
+**What transfers and what does not.** Radio astronomy's *search over
+unknown parameters* (drift, period, width) and its *noise statistics*
+transfer; imaging does not — it assumes a sky that holds still for hours
+and many antennas. Our targets are brief, intermittent and moving, on
+8-bit radios, and every method below is judged against that.
+
+**Every option has hover text.** Each method is a box, off by default, on
+the sub-tab named with it. Hovering over the box shows the text drafted
+here — what it finds, when to use it, how, and what it cannot do — in the
+18-year-old-operator voice of the RFMLS Training tab. The drafts are part
+of the design: change the method, change its text.
+
+**1. Spectral kurtosis (SK)** — `atkdsp_sk` (C1). Gaussian noise scores 1,
+impulsive or bursty energy above 1, constant-envelope signals below 1.
+Three uses: (a) the noise floor (§2) leaves out bins SK flags, so bursty
+signals cannot pull it up — `floor.estimate` keeps its quantile method and
+gains the mask; (b) an `SK↑` badge on any box whose energy is impulsive —
+pulses, sparks, switching supplies, short bursts that averaging dilutes;
+(c) excision of impulsive cells before every long integration — Sift's
+dwells and the §4.3 buffer here, atkdf's covariance and atkpr's CPI there.
+Blind spot: OFDM, LTE and anything noise-like look Gaussian to it.
+*Where:* AI Detect → **Spectral kurtosis**.
+
+> **Hover:** "Finds energy that comes and goes — pulses, clicks, sparks,
+> short bursts — that averaging hides. **Use it when** you are after
+> something that keys up briefly or a noisy electrical device (a power
+> supply, a cheap bug), or when the noise floor keeps jumping. **How:** tick
+> the box. Bursty boxes get an SK↑ badge, and bursty moments are kept out of
+> the noise floor and out of long listens. **It cannot see** signals that
+> sound like steady hiss (LTE, Wi-Fi, spread spectrum)."
+
+**2. Drift-rate search** (SETI's Taylor de-Doppler tree) —
+`atkdsp_drift_tree` (C2). Sums power along slanted lines in the waterfall,
+so a narrow carrier that drifts keeps its full integration gain instead of
+smearing across bins. Cheap oscillators warming up drift; so do moving
+transmitters, drones and low-orbit satellites. In Sift the same tree runs
+across the per-segment statistics, summing along drifting α tracks instead
+of one α bin — the answer to the drift loss §4.4's review measured
+(13.9 → 4.8 for 4 Hz over 4 s); what it recovers is measured on that case,
+not claimed. A large drift rate is a linear sweep, so sweep jammers and
+LFM chirps fall out of the same search. The rate goes on the box and into
+the fingerprint features (atkdsp B8).
+*Where:* Sift → **Drift search**; AI Detect → **Drift-rate search** (long
+buffers only).
+
+> **Hover:** "Finds a weak, narrow signal whose frequency slowly slides — a
+> cheap transmitter warming up, something moving, a satellite. Normal
+> averaging smears it out; this follows the slide. **Use it when** you are
+> listening a long time for faint carriers, bugs or beacons, or a signal
+> you can hear will not stay in one place. **How:** tick the box and choose
+> how fast a slide to look for (faster costs more). Each find shows its
+> drift in Hz per second. **Not for** quick looks — it needs several
+> seconds of listening to pay off."
+
+**3. ON/OFF cadence** (SETI's interference test). A real target appears
+when the antenna or beam points at it and disappears when it points away;
+local interference stays either way. Alternate ON and OFF dwells — a
+directional antenna turned, a Kraken beam steered, or in a bug sweep
+inside the room and then outside — in Breakthrough Listen's ABACAD order
+(three ONs between three different OFFs), and keep only what follows the
+cadence every time, so a coincidence has to happen three times. A
+procedure, not a kernel: it drives Sift's dwells and compares their
+findings.
+*Where:* Sift → **ON/OFF cadence**; the Bug Sniffer (ATK) when it is built.
+
+> **Hover:** "Tells a signal coming FROM one place apart from everything
+> else around you. **Use it when** you suspect a particular room, building
+> or direction — a bug sweep, or checking whether a weak signal really is
+> over there. **How:** tick the box; ATK tells you when to point ON (at the
+> place, or inside the room) and when to point OFF (away, or outside),
+> three times each. Only signals that appear every time you are ON and
+> vanish when you are OFF are kept. Six listens; hold still during each."
+
+**4. Periodic search** (pulsar methods) — `atkdsp_periodic` (C3).
+Harmonic summing finds narrow repeating pulses; folding at a candidate
+period stacks pulses too weak to see one at a time; the fast folding
+algorithm covers long periods (about half a second and up); a small
+acceleration search lets the period drift for a moving emitter. It works
+*below* single-pulse detection, so it complements `pulse_runs` and the
+bench's PRI tools rather than repeating them. The bench's trap applies:
+score the comb, report the fundamental.
+*Where:* Sift → **Periodic search**; Cuts → **Find a repeat**.
+
+> **Hover:** "Finds something that repeats on a schedule — a beacon, a
+> radar, a timed burst — even when each pulse is too weak to see, by
+> stacking the pulses on top of each other. **Use it when** you suspect a
+> regular transmitter (a beacon every few seconds, a radar sweep, a device
+> that pings) or a cut looks like noise but might be pulsing. **How:** tick
+> the box and listen for at least ten repeats. Results show the period and
+> how strong the stacked pulse is. **Not for** signals that key up at
+> random."
+
+**5. Single-pulse search** (fast-radio-burst method) —
+`atkdsp_boxcar_ladder` (C4). Matched filters at widths a factor of 2 apart,
+from one frame to seconds; the best width wins, and a burst of any length
+lands within ~1.5 dB of a matched filter where a fixed tile dilutes a short
+burst and splits a long one. A proposer beside CFAR; its boxes carry the
+width.
+*Where:* AI Detect → **Burst-width search**.
+
+> **Hover:** "Finds single faint bursts of any length — a key-up, a data
+> blip, a one-off transmission — that the normal detector misses. **Use it
+> when** you are waiting for something that transmits once, briefly.
+> **How:** tick the box; it runs on the live waterfall, and each box shows
+> how long the burst lasted. **Costs** a little CPU — turn it off if the
+> waterfall lags."
+
+**6. Faint-streak search** (AOFlagger's SumThreshold, turned around) —
+`atkdsp_sumthreshold` (C5). Flags runs of 1, 2, 4, 8 … cells along time or
+frequency whose average clears a threshold that falls as the run grows.
+Astronomers use it to find faint streaks so they can delete them; here the
+streaks are the find — long weak carriers and short broadband clicks that
+cell-by-cell CFAR misses. Thresholds are measured on terminated and
+quiet-band captures, not borrowed.
+*Where:* AI Detect → **Faint-streak search**.
+
+> **Hover:** "Finds faint lines in the waterfall — a weak signal that stays
+> on for a long time, or a short click across many frequencies — too dim,
+> square by square, for the normal detector. **Use it when** the waterfall
+> looks empty but you suspect something faint and steady is there. **How:**
+> tick the box; it marks the streaks it finds on the live waterfall."
+
+**7. Correlation radiometer** (radio interferometry) —
+`atkdsp_xcorr_radiometer` (C6), KrakenSDR only. Cross-correlate the
+coherent channels: each channel's own receiver noise does not correlate
+and averages away, so only energy reaching both antennas survives. That
+sidesteps the noise-level uncertainty that caps every single-receiver
+energy detector, and fills the gap `sift.LIMITS` states — a waveform with
+no cyclic features "can hide from it, and against that only a carefully
+calibrated radiometer helps." Limits, said on the page: noise that reaches
+every antenna (city noise, nearby electronics) still correlates; the
+Kraken's shared-clock spurs and crosstalk correlate too and are mapped
+first with terminated inputs, as Sift maps the radio's own features;
+sensitivity still grows only as √(B·T). The pair phases are a rough
+bearing, passed to atkdf as a wide, low-weight line of bearing.
+*Where:* Sift → **Correlation radiometer (Kraken)**.
+
+> **Hover:** "For a transmitter built to look like plain noise. Two
+> antennas hear the same signal, but each radio's own hiss is different —
+> so comparing them cancels the hiss and leaves the signal. **Use it when**
+> Sift's normal search finds nothing but you still suspect something
+> (spread spectrum, noise-like, low probability of intercept). **How:**
+> KrakenSDR only. Run **Calibrate** once per gain setting with terminators
+> on the inputs, put the antennas back, tick the box. Expect minutes, not
+> seconds. **It cannot** separate a signal from noise that comes from
+> everywhere (city noise, nearby electronics)."
+
+**Shared rules.** Twin-first in atkdsp; every threshold derived or
+measured, never tuned; every search with a negative control in its test;
+every trigger, setting, finding and timing logged at INFO; every finding
+*Proposed* until a cut, the classifier or a decoder says more.
+
+**On the waterfall.** These are long-listen searches, so their boxes share
+one new source colour for the family, chosen by the §12.2 palette search
+(not picked yet), with a badge naming the method and its number: `SK↑`,
+`drift 1.2 Hz/s`, `↻ 2.0 s`, `▮ 12 ms`, `streak`, `×corr`.
+
+**Not added, and why.** CLEAN for the detector — it belongs to passive
+radar (`ATKPR_PLAN.md` §6A.4); dedispersion — nothing disperses
+terrestrial RF, and the drift tree covers sweeps; imaging — five elements
+give too few antenna pairs; VLBI — needs atomic clocks.
+
 ## 5. Stage 3 — tracks and confirmation
 
 **Tracker.** Boxes from successive tiles are associated (Hungarian
@@ -692,6 +976,11 @@ spectrum view are what it already draws plus one menu item:
 The same three filters are also offered from the Signals bench on any cut
 it already has, so nothing is reachable from only one place.
 
+**Hover text on the new options** (Bill, 2026-10-28). Every option added
+by §4.5 and §4.6 carries hover text saying what it finds, when to use it,
+how, and what it cannot do, in plain words; the drafts are in those
+sections and change with the method.
+
 ## 12.2 The boxes — source is the edge, class is the caption, confirmation is the weight
 
 Bill, 2026-10-08: *"specific color coded detector boxes on the waterfall in
@@ -709,6 +998,8 @@ same box. So:
 | Energy (CFAR) | thin, grey-white, dashed — the quiet baseline | none | no pulse (it would be constant) |
 | **Cyclostationary** — found or assisted by the cyclic detector (§3, §4.3) | **vermilion** `#ff5400`, dashed (was cyan — see below) | `α`, with the integration time when it came from the buffer | one 600 ms edge pulse |
 | **AI** — the learned detector (§3) | **magenta**, dashed | `AI`, with a small confidence bar | one 600 ms edge pulse |
+| **Audio ID** (§4.5) — *planned* | a fourth source colour, dashed (not picked yet) | `♪` with the demod mode | one 600 ms edge pulse |
+| **Radio-astronomy searches** (§4.6) — *planned* | one family colour, dashed (not picked yet) | the method and its number: `SK↑` · `drift 1.2 Hz/s` · `↻ 2.0 s` · `▮ 12 ms` · `streak` · `×corr` | one 600 ms edge pulse |
 | Two or three proposers agree | alternating vermilion/magenta dash | badges stack | one pulse |
 | **Confirmed** by a decoder (§5) | **solid**, heavier, in the technology's own colour (today's scheme) | ✓ — the source badges **stay**, so the box reads *"AI found it, DSD confirmed it"* | one brighter pulse |
 | Appeared only after a clean (§4.3) | hatched inner edge | `post-clean` | — |
@@ -787,3 +1078,18 @@ same box. So:
   seen again; the environment classified, not thresholded. ✅ Bill's idea,
   2026-10-12 (*"an LPI/LPD detector … as our deep scan"*); the design,
   Claude.
+- **D15 — Audio ID** (§4.5): optional and last to run; an escalation on
+  three triggers, never a proposer; voice-width types the operator flags,
+  kept only where the with/without grade on kept-aside real originals shows
+  it helps; the demod recipe locked in the model card; trained from the
+  RFMLS library with its roles; an opinion on the box, below a decoder.
+  ✅ Bill's idea and placement, 2026-10-28; the mechanisms, Claude.
+  **Planned, not built.** Outside audio-only recordings: pending Bill.
+- **D16 — Radio-astronomy search methods** (§4.6): spectral kurtosis,
+  drift-rate search, ON/OFF cadence, periodic search, single-pulse search,
+  faint-streak search and the Kraken correlation radiometer — each an
+  option off by default with hover text saying when and how to use it;
+  kernels in atkdsp Part C; one family colour on the waterfall. ✅ Bill,
+  2026-10-28 (*"the ones that you recommend, we should add … make sure
+  that when they hover over that option, that text appears"*); the
+  shortlist and the mechanisms, Claude. **Planned, not built.**
