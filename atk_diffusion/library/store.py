@@ -859,6 +859,12 @@ class TrainingLibrary:
              "atk:library_version": VERSION}
         if note:
             g["atk:note"] = str(note)[:500]
+        # WHERE THE LABEL CAME FROM (2026-10-28): decoder / library / ai /
+        # operator, and what it said. A trainer may weight by it — a wrong
+        # label poisons a model faster than a missing one.
+        for k in ("label_source", "label_hint"):
+            if src.get(k):
+                g[f"atk:{k}"] = str(src[k])[:120]
         if src.get("cut_folder"):
             g["atk:source_cut"] = str(src["cut_folder"])
         centre_abs = c + f_off
@@ -1134,11 +1140,27 @@ def _same_path(a, b) -> bool:
 
 def _group_key(src: dict) -> str:
     """The recording an original comes from: its capture (the SigMF base),
-    else its cut folder; '' when unknown (the original is its own group)."""
+    else its cut folder, else a live SESSION; '' when unknown (the original
+    is its own group).
+
+    THE SESSION (2026-10-28, Bill: *"a right click where I draw a box and
+    select save to model training data"*). A box saved from the live
+    waterfall has no recording file, so without this every box would be its
+    own recording — and two boxes from one transmission could land on both
+    sides of the train/test line, grading the model on a near-copy of what
+    it trained on. ATK passes `session` (its `rfmls.live_session`: one
+    receiver, one tuning, saves within minutes of each other), and the
+    session is the recording: its originals share a role, and a stretch
+    saved twice is refused — the same rules as a capture. `sample_offset`
+    is then counted from the session's start, so the overlap check works
+    across boxes."""
     for k in ("capture", "cut_folder"):
         v = str(src.get(k, "") or "").strip()
         if v:
             return os.path.normcase(os.path.normpath(v))
+    s = str(src.get("session", "") or "").strip()
+    if s:
+        return s
     return ""
 
 

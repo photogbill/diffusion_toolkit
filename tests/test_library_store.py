@@ -280,3 +280,46 @@ def test_a_write_stopped_part_way_is_never_listed(rf, lib):
     sigmf.write_pair(folder / ".orig_0001_d00001.partial",
                      np.zeros(4096, np.complex64), 25600.0, F0, datatype="cf32")
     assert [e.kind for e in lib.examples("t1")] == ["originals"]
+
+
+def test_live_boxes_of_one_session_are_one_recording(rf, lib):
+    """2026-10-28, Save to training data… on a waterfall box: a live box has
+    no recording, so ATK passes a `session`. The session IS the recording —
+    its originals share one role, a stretch saved twice is refused — a new
+    session is a new recording, and where the label came from is kept."""
+    lib.new_type("fire_nfm", link="nfm_voice")
+    rng = np.random.default_rng(5)
+    n = int(1.6 * FS)
+    pn = 10 ** (-35 / 10)
+    x = native.noise(n, pn, rng)
+    s, lab = native.waveform("nfm_voice", FS, int(1.2 * FS), rng,
+                             carrier_offset_hz=150e3)
+    a = native.signal_amplitude(25.0, lab["bandwidth_hz"], pn, FS)
+    i0 = int(0.2 * FS)
+    x[i0:i0 + s.size] += (a * s).astype(np.complex64)
+
+    def box(t0, t1):
+        return {"t0_s": t0, "t1_s": t1, "f_lo_hz": F0 + lab["f_lo_hz"] - 6e3,
+                "f_hi_hz": F0 + lab["f_hi_hz"] + 6e3}
+
+    src = {"kind": "live", "session": "live|rtl-sdr|162400000|1024000|1000000",
+           "epoch": 1000.0, "sample_offset": 0,
+           "label_source": "operator", "label_hint": "county fire"}
+    first = lib.add_original_from_iq(x, FS, F0, box(0.25, 0.6), "fire_nfm",
+                                     source=src)
+    second = lib.add_original_from_iq(x, FS, F0, box(0.8, 1.2), "fire_nfm",
+                                      source=src)
+    assert first.group == second.group == src["session"]
+    assert first.role == second.role == "train"
+    g = lib.meta(first)["global"]
+    assert g["atk:label_source"] == "operator"
+    assert g["atk:label_hint"] == "county fire"
+    assert g["atk:source_kind"] == "live"
+    with pytest.raises(store.LibraryError, match="overlaps"):
+        lib.add_original_from_iq(x, FS, F0, box(0.5, 0.9), "fire_nfm",
+                                 source=src)
+    later = dict(src, session="live|rtl-sdr|162400000|1024000|9000000")
+    other = lib.add_original_from_iq(x, FS, F0, box(0.25, 0.6), "fire_nfm",
+                                     source=later)
+    assert other.group == later["session"]
+    assert other.role == "test", "the 2nd recording of a type grades"
