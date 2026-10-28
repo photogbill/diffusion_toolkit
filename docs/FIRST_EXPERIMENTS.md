@@ -156,6 +156,29 @@ captures, unknown rejection on the held-out class, CPU latency per tile.
 `atkdiff.bat experiment augment --profile rtlsdr_2400000_cu8` (stand-ins
 here; `train augmenter` on cabled recordings for the real run).
 
+## Phase 2a — your first trained recognizer, from ATK (2026-10-26)
+
+The quickest real number in this file, and no prompt needed: ATK →
+Setup & Config → **RFMLS Training**. The tab's *Start here* page walks it;
+in short:
+
+1. **Receiver** — pick the profile you record with (e.g.
+   `bladerf2_4000000_ci16`); measure it once with a terminator.
+2. **Collect** — a signal type per signal you know; at least three separate
+   real recordings of each (the 2nd is kept aside automatically to grade).
+3. **Grow** — dirty copies (Typical, 100 per real example); fresh copies for
+   linked types; teach the AI generator (Quick first) and make variations.
+4. **Train** — the voice-width recognizer, *Quick test* first, then
+   *Normal* with *Prove the AI examples help* ticked.
+5. **Check** — the verdict, per-type accuracy graded on real kept-aside
+   recordings, the confusion table, accuracy against SNR.
+
+**Exit:** a USABLE or READY recognizer on two or more of your own signal
+types, graded on separate recordings; the with/without-AI comparison says
+whether the AI-generated examples earned their place. The same steps at a
+prompt: `atkdiff.bat library --help`.
+
+
 ## Phase 3 — repair (D1, D3, D4, D5)
 
     atkdiff.bat experiment inpaint     (D1: DSD sync across injected USB dropouts; add a trained inpainter for the learned row)

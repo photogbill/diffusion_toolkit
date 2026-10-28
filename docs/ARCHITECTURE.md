@@ -196,6 +196,40 @@ only inside `atk_diffusion.synth.torchsig_backend`. `onnxruntime` only inside
 - `ask` (B5 point-and-ask, teach), `hunt` (B6), `cabled` (A6 transmit
   safety, the loop), `sensing` (I1/I2 ESP32 CSI), `hf` (J).
 
+### 4.6 The training library (`library`, 2026-10-26)
+
+ATK's Setup → RFMLS Training is a page over this package; `atkdiff.bat
+library …` is the same thing at a prompt.
+
+- `store.TrainingLibrary(rf, profile)` owns `<rf_data>\<profile>\training\`.
+  A **signal type** is a folder (`type.json`: name, label, family, the class
+  it is linked to, its rate class). Examples are SigMF pairs at the type's
+  canonical rate: `originals\orig_NNNN`, `dirty\<orig>_dNNNNN`,
+  `fresh\fresh_<stamp>_fNNNNN`, `generated\<orig>_gNNNNN`. Writes go to a
+  `.<id>.partial` name and are moved into place; a listing never reads a
+  dot-file.
+- **Roles keep the grade honest.** Originals are `train`, `val` or `test`,
+  and the role belongs to the **recording** (`atk:group`: the capture, else
+  the cut folder): the 2nd, 7th, 12th … recording of a type is test, the
+  4th, 9th, 14th … val (`role_for_index`). Every box from one recording
+  shares its role, `set_role` moves the whole recording, and a box that
+  overlaps one already cut from the same recording is refused. Each
+  original records where its signal is (`atk:signal_span`: the drawn box
+  trimmed to where it stands above the noise around it); copies are made
+  only from the **train span** of **train** originals — inside the signal —
+  and a train original long enough keeps the last 20 % of its signal back
+  for a weak test.
+  `build` puts REAL windows only in validation and test; generated examples
+  never grade; changing a role takes that original's copies out of training.
+- Tiers (`provenance.tier_for` of each method): originals are *record*;
+  dirty, fresh and generated copies are all *invented* — made, not
+  received. Every copy names its parent and what was done to it
+  (`atk:method`, `atk:effects`, the recipe hash), and the dataset builder
+  carries the kind through as a `tier` / `origin` array.
+- `generative` cards are `kind = "augmenter"` with `input.library = True`;
+  `find(rf, profile, canonical)` returns the newest.
+
+
 ## 5. Shared formats
 
 ### Built datasets — `<rf_data>\<profile>\datasets\<name>\`

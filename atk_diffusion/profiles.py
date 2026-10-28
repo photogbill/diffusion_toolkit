@@ -65,6 +65,12 @@ FAMILIES: dict[str, dict] = {
                   "datatype": "ci16", "transmit": False, "channels": 1},
     "airspy":    {"label": "Airspy", "adc_bits": 12, "datatype": "ci16",
                   "transmit": False, "channels": 1},
+    # Signal Hound (2026-10-26): calibrated measurement receivers, receive
+    # only — ATK's signalhound_native drives them through Signal Hound's API.
+    "bb60":      {"label": "Signal Hound BB60", "adc_bits": 14,
+                  "datatype": "ci16", "transmit": False, "channels": 1},
+    "sa44":      {"label": "Signal Hound SA44/SA124", "adc_bits": 16,
+                  "datatype": "cf32", "transmit": False, "channels": 1},
     "esp32csi":  {"label": "ESP32 CSI sensor", "adc_bits": 0,
                   "datatype": "cf32", "transmit": False, "channels": 1},
     "sigmf-import": {"label": "an imported SigMF file", "adc_bits": 0,
@@ -86,7 +92,8 @@ _DT_ALIASES = {
 ATK_SOURCES = {"rtl-sdr": "rtlsdr", "rtlsdr": "rtlsdr", "hackrf": "hackrf",
                "kraken": "krakensdr", "krakensdr": "krakensdr",
                "spyserver": "spyserver", "kiwi": "kiwisdr",
-               "kiwisdr": "kiwisdr", "airspy": "airspy"}
+               "kiwisdr": "kiwisdr", "airspy": "airspy",
+               "bb60": "bb60", "sa44": "sa44"}
 
 _PID = re.compile(r"^(?P<family>[a-z0-9][a-z0-9\-]*?)_(?P<rate>\d+)_"
                   r"(?P<dt>cu8|ci8|ci16|cf32)(?:_(?P<variant>[a-z0-9][a-z0-9\-_]*))?$")
@@ -331,6 +338,10 @@ def family_from_hw(hw: str) -> str:
     h = str(hw or "").lower()
     if "kraken" in h:
         return "krakensdr"
+    if "bb60" in h:
+        return "bb60"
+    if "sa44" in h or "sa124" in h:
+        return "sa44"
     if "hackrf" in h:
         return "hackrf"
     if "bladerf" in h:

@@ -75,6 +75,9 @@ utilized".)
                               does not load)
   <profile>\\runs\\             training and evaluation logs
   <profile>\\cuts\\             signal cuts: original + cleaned + analysis
+  <profile>\\training\\         the training library: one folder per signal
+                              type (real originals, dirty / fresh / AI-made
+                              copies) — ATK's Setup -> RFMLS Training
   products\\                   maps, tracks, fingerprints — open formats
   shared\\                     class lists, label schemas — nothing per-profile
 
@@ -208,6 +211,13 @@ class RfData:
 
     def cuts(self, profile: str) -> Path:
         return self.profile_dir(profile) / "cuts"
+
+    def training(self, profile: str, signal_type: str = "") -> Path:
+        """The training library (RFMLS Training, 2026-10-26): ONE folder of
+        training examples per signal type — `training\\<type>\\originals`,
+        `dirty`, `fresh`, `generated` (`atk_diffusion.library.store`)."""
+        base = self.profile_dir(profile) / "training"
+        return base / _safe(signal_type) if signal_type else base
 
     def products(self, kind: str = "") -> Path:
         base = self.root / "products"

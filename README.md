@@ -44,6 +44,7 @@ Data never lives in this folder: everything goes to
 | `cut` | the signal cut: cut, analyze, clean, route, save |
 | `synth` | TorchSig 2.2 and native generators, labels, environment profiles, scenes, datasets |
 | `learn` | training (PyTorch, training environment only): proposer, classifier, SSL, calibration, export, the diffusion models |
+| `library` | the training library behind ATK's Setup → RFMLS Training: signal types, real examples, dirty / fresh / AI-generated copies, the dataset builders, the trainers and their plain-words verdicts (2026-10-26) |
 | `experiments` | each track's first experiment, with a report |
 | `repair`, `fingerprint`, `geo`, `text`, `ask`, `hunt`, `cabled`, `sensing`, `hf` | the tracks D, C, E, F, B5, B6, the cabled loop, I and J |
 

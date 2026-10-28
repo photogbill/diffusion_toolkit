@@ -1,4 +1,4 @@
-# Build status — 2026-10-09
+# Build status — 2026-10-09 (training library added 2026-10-26)
 
 What is built, how it was checked, and what still needs your hardware, your
 captures or your GPU. Plain rule used throughout: **built** means the code
@@ -6,6 +6,34 @@ path exists end to end and has tests; **measured here** means a number came
 out of it on synthetic stand-ins in the build container (Linux, 2 CPUs, no
 GPU, no radios); **real** numbers only come from your machine
 (`docs/FIRST_EXPERIMENTS.md` says how to get each one).
+
+## 2026-10-26 — the training library (ATK's Setup → RFMLS Training)
+
+A new package, `atk_diffusion.library`, behind ATK's new Setup tab: one
+training folder per receiver, one folder per signal type inside it, real
+examples cut from recordings, three kinds of grown copies, the dataset
+builders and trainers that read it, and plain-words verdicts.
+
+| module | what |
+|---|---|
+| `library.store` | `TrainingLibrary`: `rf_data\<receiver>\training\<type>\{originals,dirty,fresh,generated}\`, `type.json`, roles (the 2nd and 4th original of every five kept aside), reversible removal (`_removed\`), atomic writes, the write log |
+| `library.dirty` | 13 impairments, three presets, recipes with operator overrides, an in-memory preview; copies only from the train span of train originals |
+| `library.fresh` | re-synthesis matched to the measured originals, for types linked to a native class |
+| `library.generative` | the AI generator: TFD-lite U-Net taught on the library's train spans plus synthetic classes; SDEdit variations; the quality gate (bandwidth, centre, spectrum shape); *invented* tier |
+| `library.build` | recognizer dataset per rate class (validation and test REAL only, `tier` and `origin` arrays, `test_sources`); finder scenes with library signals injected |
+| `library.train` | presets, `train_recognizer` (with the with/without-AI comparison), `train_finder`, verdicts, `models_overview`, retire / bring back, the report |
+| `cli library …` | 14 actions; `--result-file` on every command (ATK's tab reads it) |
+
+**Tests:** 1,245 passing, 27 skipped (`python -m pytest tests`, about 3
+minutes) — the library in `tests/test_library_{store,generative,build_train,cli,review}.py`.
+An independent review the same evening found twelve faults in the honest-
+grading rules and the job handling; `test_library_review.py` pins each fix
+(roles by recording, overlaps refused, the grade on real windows only, the
+held-back tail inside the signal, the AI comparison on validation, finder
+test scenes from kept-aside signals, stale generators refused, `--stop-file`).
+**Not run here:** the GPU paths at full size (teach, generate, train) —
+they are exercised at toy sizes on the CPU; real numbers come from Bill's
+machine (`FIRST_EXPERIMENTS.md`, Phase 2a).
 
 ## In numbers
 

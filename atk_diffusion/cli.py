@@ -30,6 +30,10 @@ words — a sentence per result and per failure (plan §2.9, Bill-proof).
     hunt simulate                  the self-hunting receiver against a simulated band
     vitals replay <csi log>        breathing / heart rate from a saved ESP32 CSI log
     repair audio <wav>             fill dropouts in a WAV (INFERRED tier, listed)
+    library list | new-type | add | add-cut | dirty | fresh | teach-generator |
+            generate | plan | train | train-finder | models | retire | bring-back
+                                   the training library behind ATK's Setup ->
+                                   RFMLS Training (one folder per signal type)
 
 EXIT CODES: 0 done; 1 refused or failed (the sentence says why); 2 the
 command line itself was wrong (argparse's usage message).
@@ -113,6 +117,12 @@ class Ctx:
 
     def progress(self, msg: str) -> None:
         self.say(f"  ... {msg}")
+
+    def should_stop(self) -> bool:
+        """True once the --stop-file exists: ATK's Stop asks a job to finish
+        the example in hand and end cleanly before it is ever killed."""
+        f = getattr(self.a, "stop_file", None)
+        return bool(f) and Path(f).exists()
 
     # -- rf_data -----------------------------------------------------------
     def root(self) -> Path:
@@ -2398,6 +2408,262 @@ def cmd_repair_audio(ctx) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# the training library (ATK's Setup -> RFMLS Training, 2026-10-26)
+# ---------------------------------------------------------------------------
+def _lib(ctx, create: bool = False):
+    from atk_diffusion.library import store
+    return store.TrainingLibrary(ctx.rf(create=create), _profile_id(ctx.a.profile))
+
+
+def _store_error():
+    from atk_diffusion.library.store import LibraryError
+    return LibraryError
+
+
+def _lib_types(lib, which: str) -> list[str]:
+    names = [t.name for t in lib.types()]
+    if which in ("all", "*"):
+        if not names:
+            raise Fail("the library has no signal types yet")
+        return names
+    if which not in names:
+        raise Fail(f"there is no signal type '{which}' in the library of "
+                   f"{_describe(lib.pid)}")
+    return [which]
+
+
+def cmd_library_list(ctx) -> dict:
+    lib = _lib(ctx)
+    rows = lib.summary()
+    if not rows:
+        ctx.say(f"The training library of {_describe(lib.pid)} is empty: "
+                f"{lib.root}")
+    for r in rows:
+        t, c = r["type"], r["counts"]
+        ctx.say(f"{t['name']} ({t['label']}, {t['family']}"
+                + (f", a kind of {t['link']}" if t["link"] else "")
+                + (f", {t['canonical']}-width" if t["canonical"] else "")
+                + f"): {c['originals']} real ({c['roles']['train']} train, "
+                f"{c['roles']['val']} val, {c['roles']['test']} test), "
+                f"{c['dirty']} dirty, {c['fresh']} fresh, {c['generated']} AI")
+    return {"profile": lib.pid, "root": str(lib.root), "types": rows}
+
+
+def cmd_library_new_type(ctx) -> dict:
+    a = ctx.a
+    lib = _lib(ctx, create=True)
+    st = lib.new_type(a.name, label=a.label or "", family=a.family or "",
+                      link=a.link or "", notes=a.notes or "")
+    ctx.say(f"New signal type {st.name} ({st.label}) in {lib.type_dir(st.name)}")
+    return st.to_json()
+
+
+def cmd_library_add(ctx) -> dict:
+    a = ctx.a
+    lib = _lib(ctx, create=True)
+    box = {"t0_s": a.t0, "t1_s": a.t1, "f_lo_hz": a.f_lo, "f_hi_hz": a.f_hi}
+    ex = lib.add_original_from_capture(_capture(a.capture), box, a.type,
+                                       note=a.note or "")
+    ctx.say(f"Added {ex.id} to {a.type}: {ex.seconds:.2f} s at "
+            f"{_rate_words(ex.rate)}, {ex.role} ({ex.base})")
+    return ex.to_json()
+
+
+def cmd_library_add_cut(ctx) -> dict:
+    a = ctx.a
+    lib = _lib(ctx, create=True)
+    ex = lib.add_original_from_cut(a.cut, a.type, note=a.note or "")
+    ctx.say(f"Added {ex.id} to {a.type} from the cut {Path(a.cut).name}")
+    return ex.to_json()
+
+
+def cmd_library_dirty(ctx) -> dict:
+    from atk_diffusion.library import dirty
+    a = ctx.a
+    lib = _lib(ctx, create=True)
+    overrides = None
+    if a.recipe:
+        try:
+            overrides = json.loads(Path(a.recipe).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            raise Fail(f"the recipe file could not be read: {e}") from None
+        if isinstance(overrides, dict) and "effects" in overrides:
+            overrides = overrides["effects"]
+    rec = dirty.recipe(a.preset, overrides, length=int(a.length))
+    for line in dirty.describe(rec):
+        ctx.say(f"  {line}")
+    out = []
+    names = _lib_types(lib, a.type)
+    every = a.type in ("all", "*")
+    for i, t in enumerate(names):
+        if ctx.should_stop():
+            break
+        try:
+            r = dirty.make_dirty(lib, t, int(a.per_original), rec,
+                                 seed=int(a.seed) + i, progress=ctx.progress,
+                                 should_stop=ctx.should_stop)
+        except _store_error() as e:
+            if not every:
+                raise
+            # "every type": one empty type must not stop the others
+            ctx.say(f"{t}: skipped — {e}")
+            out.append({"type": t, "made": 0, "why": str(e),
+                        "words": f"{t}: skipped ({e})"})
+            continue
+        ctx.say(r["words"])
+        out.append(r)
+    return {"results": out}
+
+
+def cmd_library_fresh(ctx) -> dict:
+    from atk_diffusion.library import fresh
+    a = ctx.a
+    lib = _lib(ctx, create=True)
+    snr = _floats(a.snr, "--snr")
+    if len(snr) != 2:
+        raise Fail("--snr is LOW,HIGH in dB, e.g. 0,25")
+    out = []
+    for i, t in enumerate(_lib_types(lib, a.type)):
+        ok, why = fresh.can_make(lib, t)
+        if not ok:
+            ctx.say(f"{t}: {why}")
+            out.append({"type": t, "made": 0, "why": why})
+            continue
+        if ctx.should_stop():
+            break
+        r = fresh.make_fresh(lib, t, int(a.count), tuple(snr), seed=int(a.seed) + i,
+                             progress=ctx.progress, should_stop=ctx.should_stop)
+        ctx.say(r["words"])
+        out.append(r)
+    return {"results": out}
+
+
+def cmd_library_teach_generator(ctx) -> dict:
+    from atk_diffusion.library import generative
+    a = ctx.a
+    _need_torch("teaching the generator")
+    rf = ctx.rf(create=True)
+    d = generative.teach(rf, _profile_id(a.profile), a.canonical, preset=a.preset,
+                         steps=a.steps, include_dirty=not a.no_dirty,
+                         device=a.device, seed=int(a.seed), progress=ctx.progress,
+                         should_stop=ctx.should_stop)
+    ctx.say(generative.describe(rf, _profile_id(a.profile), a.canonical))
+    return {"model_dir": str(d)}
+
+
+def cmd_library_generate(ctx) -> dict:
+    from atk_diffusion.library import generative
+    a = ctx.a
+    _need_torch("making AI-generated variations")
+    rf = ctx.rf(create=True)
+    lib = _lib(ctx, create=True)
+    out = []
+    every = a.type in ("all", "*")
+    for i, t in enumerate(_lib_types(lib, a.type)):
+        if ctx.should_stop():
+            break
+        try:
+            r = generative.generate(rf, lib.pid, t, int(a.per_original),
+                                    strength=float(a.strength), steps=int(a.steps),
+                                    seed=int(a.seed) + i, device=a.device,
+                                    progress=ctx.progress,
+                                    should_stop=ctx.should_stop)
+        except _store_error() as e:
+            if not every:
+                raise
+            ctx.say(f"{t}: skipped — {e}")
+            out.append({"type": t, "made": 0, "why": str(e),
+                        "words": f"{t}: skipped ({e})"})
+            continue
+        ctx.say(r["words"])
+        out.append(r)
+    return {"results": out}
+
+
+def cmd_library_plan(ctx) -> dict:
+    from atk_diffusion.library import build
+    a = ctx.a
+    lib = _lib(ctx)
+    p = build.plan(lib, a.canonical, include=tuple(_words(a.include)))
+    for r in p["types"]:
+        ctx.say(f"{r['type']}: {r['train_originals']} real for training, copies "
+                f"{r['copies']}, {r['val_windows']} val / {r['test_windows']} test "
+                "real windows")
+    for w in p["warnings"]:
+        ctx.say(f"note: {w}")
+    return p
+
+
+def cmd_library_train(ctx) -> dict:
+    from atk_diffusion.library import train
+    a = ctx.a
+    _need_torch("training the recognizer")
+    rf = ctx.rf(create=True)
+    res = train.train_recognizer(
+        rf, _profile_id(a.profile), a.canonical, preset=a.preset,
+        include=tuple(_words(a.include)), held_out=a.held_out or None,
+        name=a.name or None, compare_generated=bool(a.compare_ai),
+        device=a.device, seed=int(a.seed), progress=ctx.progress,
+        should_stop=ctx.should_stop)
+    v = res["verdict"]
+    ctx.say(v["headline"])
+    for r in v["reasons"]:
+        ctx.say(f"  {r}")
+    if res.get("compare"):
+        ctx.say(f"  {res['compare']['words']}")
+    ctx.say(f"Report: {res['report']}")
+    return res
+
+
+def cmd_library_train_finder(ctx) -> dict:
+    from atk_diffusion.library import train
+    a = ctx.a
+    _need_torch("training the finder")
+    rf = ctx.rf(create=True)
+    res = train.train_finder(rf, _profile_id(a.profile), preset=a.preset,
+                             scenes=a.scenes, use_library=not a.no_library,
+                             name=a.name or None, device=a.device,
+                             seed=int(a.seed), progress=ctx.progress,
+                             should_stop=ctx.should_stop)
+    ctx.say(res["verdict"]["headline"])
+    ctx.say(f"Report: {res['report']}")
+    return res
+
+
+def cmd_library_models(ctx) -> dict:
+    from atk_diffusion.library import train
+    rf = ctx.rf()
+    pid = _profile_id(ctx.a.profile)
+    rows = train.models_overview(rf, pid)
+    for m in rows:
+        ctx.say(f"{m['name']} — {m['what']}"
+                + (f" ({m['canonical']})" if m["canonical"] else "")
+                + (" — IN USE" if m["in_use"] else "")
+                + (" — retired" if m["retired"] else "")
+                + f": {m['verdict'].get('headline', '')}")
+    if not rows:
+        ctx.say(f"No recognizer, finder or generator has been trained for "
+                f"{_describe(pid)} yet.")
+    return {"models": rows}
+
+
+def cmd_library_retire(ctx) -> dict:
+    from atk_diffusion.library import train
+    rf = ctx.rf()
+    d = train.retire(rf, _profile_id(ctx.a.profile), ctx.a.model)
+    ctx.say(f"Retired {ctx.a.model}: {d}")
+    return {"dir": str(d)}
+
+
+def cmd_library_bring_back(ctx) -> dict:
+    from atk_diffusion.library import train
+    rf = ctx.rf()
+    d = train.bring_back(rf, _profile_id(ctx.a.profile), ctx.a.model)
+    ctx.say(f"Brought back {ctx.a.model}: {d}")
+    return {"dir": str(d)}
+
+
+# ---------------------------------------------------------------------------
 # the parser
 # ---------------------------------------------------------------------------
 class _Parser(argparse.ArgumentParser):
@@ -2418,6 +2684,12 @@ def _common() -> argparse.ArgumentParser:
                    help="print the result as JSON on stdout (words go to stderr)")
     p.add_argument("--debug", action="store_true", default=argparse.SUPPRESS,
                    help="print the full traceback of an unexpected error")
+    p.add_argument("--result-file", default=argparse.SUPPRESS, metavar="PATH",
+                   help="also write the JSON result to this file (how ATK's "
+                        "RFMLS Training tab reads a job's answer)")
+    p.add_argument("--stop-file", default=argparse.SUPPRESS, metavar="PATH",
+                   help="end cleanly, after the example in hand, once this "
+                        "file exists (how ATK's Stop asks a job to finish)")
     return p
 
 
@@ -3071,7 +3343,95 @@ def build_parser() -> argparse.ArgumentParser:
     v.add_argument("--gap", action="append", default=None,
                    help="START,END seconds of a gap you marked (repeatable); "
                         "without it gaps are found")
+    _add_library_parsers(sub, common)
     return ap
+
+
+def _add_library_parsers(sub, common) -> None:
+    p = sub.add_parser("library", parents=[common],
+                       help="the training library (ATK's Setup -> RFMLS Training)")
+    s = p.add_subparsers(dest="sub", metavar="ACTION", required=True)
+
+    def act(name, help_):
+        v = s.add_parser(name, parents=[common], help=help_)
+        v.add_argument("--profile", required=True, help="receiver profile id")
+        return v
+
+    act("list", "the signal types and what each holds")
+    v = act("new-type", "a new signal type")
+    v.add_argument("--name", required=True)
+    v.add_argument("--label", default="")
+    v.add_argument("--family", default="")
+    v.add_argument("--link", default="", help="the class-table class it is a kind of")
+    v.add_argument("--notes", default="")
+    v = act("add", "cut a box out of a recording into a type, as a real original")
+    v.add_argument("--type", required=True)
+    v.add_argument("--capture", required=True)
+    v.add_argument("--t0", type=float, required=True, help="seconds from the start")
+    v.add_argument("--t1", type=float, required=True)
+    v.add_argument("--f-lo", type=float, required=True, help="Hz, absolute")
+    v.add_argument("--f-hi", type=float, required=True)
+    v.add_argument("--note", default="")
+    v = act("add-cut", "a signal cut folder (RF -> Cuts) into a type")
+    v.add_argument("--type", required=True)
+    v.add_argument("--cut", required=True)
+    v.add_argument("--note", default="")
+    v = act("dirty", "dirty copies of a type's real originals")
+    v.add_argument("--type", required=True, help="a type, or 'all'")
+    v.add_argument("--per-original", type=int, default=100)
+    v.add_argument("--preset", default="typical", help="light, typical or harsh")
+    v.add_argument("--recipe", default=None, help="a JSON file of effect changes")
+    v.add_argument("--length", type=int, default=8192,
+                   help="samples per copy at the canonical rate")
+    v.add_argument("--seed", type=int, default=0)
+    v = act("fresh", "fresh copies re-made by the generator")
+    v.add_argument("--type", required=True, help="a type, or 'all'")
+    v.add_argument("--count", type=int, default=200)
+    v.add_argument("--snr", default="0,25", help="LOW,HIGH dB")
+    v.add_argument("--seed", type=int, default=0)
+    v = act("teach-generator", "teach the AI generator for one rate class")
+    v.add_argument("--canonical", required=True, help="voice, wideband or spread")
+    v.add_argument("--preset", default="normal", help="quick, normal or thorough")
+    v.add_argument("--steps", type=int, default=None)
+    v.add_argument("--no-dirty", action="store_true",
+                   help="teach on real originals only (not their dirty copies)")
+    v.add_argument("--device", default="auto")
+    v.add_argument("--seed", type=int, default=0)
+    v = act("generate", "AI-generated variations of a type's real originals")
+    v.add_argument("--type", required=True, help="a type, or 'all'")
+    v.add_argument("--per-original", type=int, default=100)
+    v.add_argument("--strength", type=float, default=0.35,
+                   help="how different: 0.05 close … 0.9 creative")
+    v.add_argument("--steps", type=int, default=20, help="sampling steps")
+    v.add_argument("--device", default="auto")
+    v.add_argument("--seed", type=int, default=0)
+    v = act("plan", "what a recognizer build would hold, and what is wrong")
+    v.add_argument("--canonical", required=True)
+    v.add_argument("--include", default="dirty,fresh,generated")
+    v = act("train", "build, train and judge the recognizer for one rate class")
+    v.add_argument("--canonical", required=True)
+    v.add_argument("--preset", default="normal", help="quick, normal or thorough")
+    v.add_argument("--include", default="dirty,fresh,generated",
+                   help="which copies train with the real originals")
+    v.add_argument("--held-out", default="", help="a type held back to measure UNKNOWN")
+    v.add_argument("--compare-ai", action="store_true",
+                   help="train with and without the AI examples; keep the better")
+    v.add_argument("--name", default="")
+    v.add_argument("--device", default="auto")
+    v.add_argument("--seed", type=int, default=0)
+    v = act("train-finder", "build scenes, train and judge the finder")
+    v.add_argument("--preset", default="normal")
+    v.add_argument("--scenes", type=int, default=None)
+    v.add_argument("--no-library", action="store_true",
+                   help="synthetic scenes only (no library signals placed)")
+    v.add_argument("--name", default="")
+    v.add_argument("--device", default="auto")
+    v.add_argument("--seed", type=int, default=0)
+    act("models", "the recognizers, finders and generators, newest first")
+    v = act("retire", "take a model out of use (moved, never deleted)")
+    v.add_argument("--model", required=True)
+    v = act("bring-back", "put a retired model back")
+    v.add_argument("--model", required=True)
 
 
 _COMMANDS = {
@@ -3107,6 +3467,20 @@ _COMMANDS = {
     ("hunt", "simulate"): cmd_hunt_simulate,
     ("vitals", "replay"): cmd_vitals_replay,
     ("repair", "audio"): cmd_repair_audio,
+    ("library", "list"): cmd_library_list,
+    ("library", "new-type"): cmd_library_new_type,
+    ("library", "add"): cmd_library_add,
+    ("library", "add-cut"): cmd_library_add_cut,
+    ("library", "dirty"): cmd_library_dirty,
+    ("library", "fresh"): cmd_library_fresh,
+    ("library", "teach-generator"): cmd_library_teach_generator,
+    ("library", "generate"): cmd_library_generate,
+    ("library", "plan"): cmd_library_plan,
+    ("library", "train"): cmd_library_train,
+    ("library", "train-finder"): cmd_library_train_finder,
+    ("library", "models"): cmd_library_models,
+    ("library", "retire"): cmd_library_retire,
+    ("library", "bring-back"): cmd_library_bring_back,
 }
 
 
@@ -3118,7 +3492,8 @@ def main(argv=None) -> int:
         a = ap.parse_args(argv)
     except SystemExit as e:
         return int(e.code) if isinstance(e.code, int) else EXIT_USAGE
-    for k, default in (("json", False), ("debug", False), ("rf_data", None)):
+    for k, default in (("json", False), ("debug", False), ("rf_data", None),
+                       ("result_file", None), ("stop_file", None)):
         if not hasattr(a, k):
             setattr(a, k, default)
     if not a.command:
@@ -3134,7 +3509,9 @@ def main(argv=None) -> int:
     except Fail as e:
         data, code, error = None, EXIT_FAIL, str(e)
     except KeyboardInterrupt:
-        data, code, error = None, EXIT_FAIL, "stopped (Ctrl-C) — nothing after this point ran"
+        data, code, error = None, EXIT_FAIL, (
+            ("stopped by Stop" if ctx.should_stop() else "stopped (Ctrl-C)")
+            + " — what was finished before it is kept; nothing half-made is")
     except (ValueError, FileNotFoundError, NotADirectoryError, PermissionError,
             RuntimeError, ImportError, OSError) as e:
         # the toolkit's refusals are ValueError subclasses that already speak
@@ -3155,7 +3532,7 @@ def main(argv=None) -> int:
             traceback.print_exc()
     if code != EXIT_OK:
         ctx.say(f"[ERR] {error or 'failed'}")
-    if a.json:
+    if a.json or a.result_file:
         payload = {"ok": code == EXIT_OK, "command": " ".join(
             x for x in (a.command, getattr(a, "sub", None) or getattr(a, "kind", None)
                         or getattr(a, "name", None)) if x)}
@@ -3163,5 +3540,20 @@ def main(argv=None) -> int:
             payload["result"] = _json_safe(data)
         else:
             payload["error"] = error
-        print(json.dumps(payload, indent=1, allow_nan=False), file=ctx.out)
+        try:
+            text = json.dumps(payload, indent=1, allow_nan=False)
+        except ValueError:
+            payload = _json_safe(payload)
+            text = json.dumps(payload, indent=1, default=str)
+        if a.json:
+            print(text, file=ctx.out)
+        if a.result_file:
+            try:
+                rp = Path(a.result_file)
+                rp.parent.mkdir(parents=True, exist_ok=True)
+                tmp = rp.with_name(rp.name + ".tmp")
+                tmp.write_text(text, encoding="utf-8")
+                tmp.replace(rp)
+            except OSError as e:
+                ctx.say(f"[ERR] the result file could not be written: {e}")
     return code

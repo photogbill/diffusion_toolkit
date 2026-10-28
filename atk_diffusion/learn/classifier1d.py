@@ -797,6 +797,26 @@ def save_trained(rf, profile: str, model, model_dir, *, dataset_dir,
                     f"{base['accuracy']:.3f}")
     else:
         run.log("nothing held out: the card carries no held-out score")
+    # -- the validation split's scores, through the ONNX too (2026-10-26) --
+    # A choice BETWEEN models (the training library's with/without-AI
+    # comparison) is made on these, never on the test split it reports.
+    if calibrate_split and K.split_files(dataset_dir, calibrate_split, "narrowband"):
+        va = D.NarrowbandDataset(dataset_dir, calibrate_split, profile, manifest=m,
+                                 classes=classes, window=window, use_scf=use_scf,
+                                 max_items=max_items)
+        if len(va):
+            vrun = X.OnnxRunner(model_dir, KIND, for_profile=profile, threads=1)
+            vout = X.run_classifier(vrun, va.shards, va.items)
+            vy = va.model_labels()
+            vk = vy >= 0
+            if np.any(vk):
+                vs = K.classification_scores(vout["logits"].argmax(axis=1)[vk],
+                                             vy[vk], classes,
+                                             va.field("snr_db")[vk], snr_bin_db)
+                met["validation"] = {"split": calibrate_split,
+                                     "cuts": int(vk.sum()),
+                                     "accuracy": vs["accuracy"],
+                                     "per_class_accuracy": vs["per_class_accuracy"]}
     card.metrics = met
     X.resave_card(model_dir, card, rf=rf)
     if calibrate_split and K.split_files(dataset_dir, calibrate_split, "narrowband"):
