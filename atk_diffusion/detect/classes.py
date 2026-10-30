@@ -44,6 +44,10 @@ DECODERS = {
     "wfm":        {"label": "WFM demodulator", "confirms": False},
     "am":         {"label": "AM demodulator", "confirms": False},
     "ssb":        {"label": "SSB demodulator", "confirms": False},
+    #: B11 (2026-10-30; DETECTION_DESIGN §4.2 "The `video` route"): ATK's
+    #: analog video viewer. A picture with field lock and the right line
+    #: count is a decode, so it CONFIRMS; H-lock with no fields does not.
+    "video":      {"label": "ATK's analog video viewer (Look)", "confirms": True},
 }
 
 
@@ -143,7 +147,8 @@ CLASSES: tuple[SignalClass, ...] = (
                                                       "bladerf2"),
                 notes="the pilot gives a conjugate feature at the carrier"),
     SignalClass("drone_fpv_analog", "analog FPV video (5.8 GHz)", "fm",
-                18_000_000.0, torchsig=("fm",), native="fpv_analog",
+                18_000_000.0, decoders=("video",),   # B11: the picture confirms it
+                torchsig=("fm",), native="fpv_analog",
                 profiles=("hackrf",),
                 notes="Ludovika compact-CNN paper; HackRF profile"),
     SignalClass("drone_digital", "digital drone link (OFDM / FHSS)", "ofdm",

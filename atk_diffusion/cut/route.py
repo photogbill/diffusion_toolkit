@@ -45,6 +45,8 @@ ROUTE_WORDS = {
     "teach": "teach — name the class; its examples become a prototype",
     "fingerprint": "fingerprint — add to the library or match against it",
     "save": "save only — the folder is the product",
+    # B11 (2026-10-30): the route that can CONFIRM an analog FPV detection
+    "video": "the analog video picture — a locked picture CONFIRMS the class",
 }
 
 

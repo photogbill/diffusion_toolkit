@@ -289,6 +289,27 @@ order, each step visible and skippable:
 Also reachable from the hunter (plan B6), which cuts what it finds, and
 from a recorded capture's waterfall as well as the live one.
 
+**The `video` route (planned 2026-10-30; `ATK\docs\SIGDIGGER_PARITY_PLAN.md`
+§V).** Status: PLAN.
+- **What it adds:** a route that turns an analog-video cut into a picture.
+- **Toolkit side:**
+  - `drone_fpv_analog` gets `decoders=("video",)` in `detect/classes.py`;
+  - `cut/route.py` gets `ROUTE_WORDS["video"] = "the analog video picture
+    — a locked picture CONFIRMS the class"`.
+- **ATK side:**
+  - `ROUTE_LABELS["video"] = "Analog video picture"`;
+  - the handler opens ATK's video viewer (`atk\ui\video_view.py`, on
+    atkdsp's video kernel) on the cut's **original** record. It never uses
+    the cleaned one unless the operator picks it, and the cleaned-input
+    warning applies as for every route.
+- **Confirmation:** a picture with field lock and the right line count is a
+  decode, so it **CONFIRMS** the class under the confirmer rule. H-lock with
+  no fields confirms nothing, and the route's history line says why.
+- **Not in this change:** a generic "analog video transmitter" class for any
+  band (0.9 / 1.2 / 2.4 GHz cameras, Bug Sniffer's VIDEO). It would change
+  the trained class set and needs its own data. The native synthesiser's
+  `fpv_analog` generator is the starting point if Bill wants it.
+
 ## 4.3 Low-SNR escalation — the buffer, and filtering with what the cyclic detector found
 
 Bill, 2026-10-08: *"if a different detector is running, and the SNR is
