@@ -21,6 +21,7 @@
 4.4 Sifting — the deep scan for signals below the noise floor (LPI / LPD)
 4.5 Audio ID — identify by how it sounds (planned)
 4.6 Weak-signal search methods from radio astronomy (planned)
+4.7 Below the floor — the detection_design folder (2026-10-30; extensions and one correction to §2)
 5. Stage 3 — tracks and confirmation
 6. Training — pretrain on real, supervise on synthetic, fine-tune on cabled
 7. Deployment — ONNX on the CPU
@@ -799,6 +800,35 @@ one new source colour for the family, chosen by the §12.2 palette search
 radar (`ATKPR_PLAN.md` §6A.4); dedispersion — nothing disperses
 terrestrial RF, and the drift tree covers sweeps; imaging — five elements
 give too few antenna pairs; VLBI — needs atomic clocks.
+
+## 4.7 Below the floor — the detection_design folder
+
+**Status: design, 2026-10-30, not built.** The work on pushing detection
+below the noise floor — Bill's OmniSIG question — lives in its own folder,
+`D:\Analyst_Toolkit\detection_design`, and extends §4.3, §4.4 and §4.6.
+Read its `README.md` first. The documents: `BELOW_THE_FLOOR.md` (the
+physics, the SNR wall, seven directions incl. the sync-word bank, track-
+before-detect with hop-period folding, deep tiles, the learned noise
+model and its classical comparator, the Chinese-methods bench on demand);
+`UNKNOWN_FIRST.md` (every detection is a U-ID; cuts in training-library
+folders under the ID; identification after the fact as a registry
+binding); `HINDSIGHT.md` (the slow detectors — Sift, the sync bank, the
+decoders — label the tiles the fast one could not see); `GAP_READING.md`
+(reconstructing what a thin paper leaves out, as a prediction);
+`RADIO_ASTRONOMY_2021_2026.md` (twelve methods from the field's last five
+years beyond §4.6, and the Ma et al. 2025 deployed FRB detector);
+`LITERATURE_NOTES.md`; `BUILD_ORDER.md` (phases, repos, gates).
+
+**One correction to this document now, so nobody builds against it:**
+§2 says the tile is "downsampled in time to a fixed 640-ish rows." That
+line is **withdrawn** (`RADIO_ASTRONOMY_2021_2026.md` §16, decision D10):
+time downsampling washes out short bursts — a 1 ms burst at 2.4 MS/s
+becomes less than one row — so the tile is **cropped into time slices and
+stacked along the channel dimension** at native resolution, with three
+dynamic-range views as input channels and a learned mask layer in front
+of the backbone (D11), the whole front end exported inside the ONNX graph
+(D12). The rest of §2 stands. When the folder's pieces are built, their
+sections move here and the copies there are marked *moved*.
 
 ## 5. Stage 3 — tracks and confirmation
 
