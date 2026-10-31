@@ -1,63 +1,63 @@
 # ATK Diffusion Toolkit
 
-Diffusion-model and learned-RF tools for ATK, in their own engine repo with
-an ATK adapter. **All rights reserved** (see `LICENSE`; `text/loop.py` alone
-is MIT, shared with Palimpsest). Package `atk_diffusion`, Python 3.11.
+Learned-RF and diffusion-model tools for ATK (the Analyst Toolkit), in their
+own engine repository with an ATK adapter. Package `atk_diffusion`,
+Python 3.11; no Qt and no network at run time. **All rights reserved**
+(see `LICENSE`; `text/loop.py` alone is MIT, shared with Palimpsest).
 
-**Status, 2026-10-09: built.** Every track of the plan has its code and its
-first experiment, proved on synthetic stand-ins (1,195 tests). The real
-numbers need your receivers, captures and GPU — `docs/FIRST_EXPERIMENTS.md`
-is the runbook, `docs/BUILD_STATUS.md` says what is built and measured.
+Two environments, one rule: the **classical half** (the front end, the
+detectors, the cuts, cyclostationary processing, the ONNX runtime, the
+library) runs in ATK's core environment on the CPU; the **training half**
+(PyTorch with CUDA, TorchSig 2.2) lives in its own environment and produces
+the models the first half runs. Every model carries a card, and a model
+without a card does not load.
 
 ## Getting it running
 
-- **Beside ATK (the normal case):** in `D:\Analyst_Toolkit\ATK` run
+- **Beside ATK (the normal case):** in the ATK folder run
   `get_diffusion.bat`. It puts the classical half into ATK's core
-  environment and builds the training environment (`envs\atk_diffusion`:
-  PyTorch with CUDA, TorchSig 2.2.0) from ATK's own Python. `/core` does
-  only the ATK half.
+  environment and builds the training environment (`envs\atk_diffusion`)
+  from ATK's own Python. `/core` installs only the ATK half.
 - **On its own:** `install.bat` here builds `.venv` (`/cpu` without an
   NVIDIA GPU).
 - Then `atkdiff.bat status`, and `atkdiff.bat --help` for every command.
 
-Data never lives in this folder: everything goes to
-`D:\Analyst_Toolkit\rf_data\`, one folder per receiver profile (plan §3).
+Data never lives in this folder: everything goes to `rf_data\` beside the
+code (one folder per receiver profile), with a write log of what produced
+each file.
 
-## The documents
+## What it provides
+
+| Area | What |
+|---|---|
+| **The RF data foundation** | receiver profiles and canonical sample rates (the sample-rate law and its refusal), `rf_data\` with its write log, SigMF labels and tiers, provenance, model cards, the logged resampler, impairment measurement and application, TorchSig 2.2 and native generators, environment profiles and the scene composer, the dataset builder |
+| **The cabled loop** | transmit-safety arithmetic and refusals, transmit files, plan / measure / align, the cabled-set ingester, and the translator between receivers — for recordings made over a cable, never over the air |
+| **The AI signal detector** | a front end in dB above the measured floor; three proposers (CFAR energy, cyclic, a 2D FCOS); an IQ + SCF 1D classifier with embeddings and cycle regression; prototypes, open-set handling and teaching; tracker, confirmer and calibration; ONNX export and CPU inference. On pure noise: zero false alarms in 20 s. |
+| **Cyclostationary processing and the cut** | FAM / SSCA, the cyclic profile, the LTE/NR cyclic-prefix probe (timing, offset, cell count), symbol-rate lines, the escalation buffer and its three classical filters (matched, FRESH, SCORE), the cut folder, route and report — ATK's right-click *Cut signal…* |
+| **Sifting — the deep scan** | the operator's list, a plan in words, a blind segmented search at several widths with a derived Gamma(K) null, a ledger, record-first dwells with confirmation, a schedule and a run log; a BPSK carrier found blind 10 dB under the floor at 250 kS/s |
+| **The hunter** | a goal in words, a rule policy, a bounded receive-only action set, a log and a simulator; in a simulated band it found 25 % of bursts against 4 % for a fixed scan |
+| **Denoisers and repair** | classical denoisers (Wiener, wavelet, median) with measured before/after SNR; the DDPM core, U-Nets and the SNR↔timestep map behind the learned weak-burst denoiser; IQ dropout detection with interpolation, AR and Janssen fills; speech enhancement at arm's length with a hallucination check; pulse deinterleaving and PRI completion with inferred pulses flagged; track, document and audio gap fills |
+| **Fingerprints and the social graph** | classical features, a library with UNKNOWN, a channel-resilient CNN, denoise-then-fingerprint; co-occurrence, schedule, co-movement and reply graphs with i2 and GeoJSON export |
+| **Geolocation** | a posterior cloud (MCMC / importance sampling, HPD contours — 90 % regions held the truth 92 % of 300 times), where-am-I from a map, a self-calibrated synthetic aperture, and **predicted reach**: a DTED reader (levels 0–2), free space / two-ray / Bullington / Deygout / ITM (Longley-Rice), antenna patterns and reach maps |
+| **The training library** | one training folder per receiver and one per signal type; real examples cut from recordings; dirty, fresh and AI-generated copies with a quality gate and an *invented* tier; the dataset builders (validation and test are real only) and the trainers with plain-words verdicts; retire and bring back; the report — ATK's Setup → RFMLS Training |
+| **Text, CSI, HF** | the host-side diffusion loop for text (novelty, revise, extract, style); ESP32 CSI parsing with presence and vitals; WSPR spots, Maidenhead and the HF openness matrix |
+| **Experiments** | each area's first experiment as a command, with a report, so a number on real hardware is one command away |
+
+The detectors are set by a false-alarm probability rather than a tuned
+threshold, every learned output carries its tier, and nothing in the
+classical half needs the GPU.
+
+## Documents
 
 | File | What it is |
 |---|---|
-| `ATK_DIFFUSION_PLAN.md` | The plan of record: principles, the RF data foundation (receiver profiles, the sample-rate law, `rf_data\`, the cabled loop, environment profiles, products), every track with its first experiment, the build order, evaluation, licenses, the papers mapped, decisions, change log. |
-| `DETECTION_DESIGN.md` | The AI signal detector in detail: three proposers, the cut and classifier, cyclostationary processing, the right-click signal cut, low-SNR escalation and the three classical filters, training, CPU deployment, licenses, classes, labels, evaluation, build steps, where it sits on screen, decisions. |
-| `docs/BUILD_STATUS.md` | What is built, what was measured here, what needs your hardware; what was found and fixed while checking; deviations from the plans and why. |
-| `docs/FIRST_EXPERIMENTS.md` | The runbook: each track's first experiment as commands to type, in the plan's build order. |
-| `docs/ARCHITECTURE.md` | How the plans map onto the code: the two environments, the rules every module follows, the shared formats (datasets, ONNX I/O, the cut folder). |
+| `docs/ARCHITECTURE.md` | How the code is organised: the two environments, the rules every module follows, the shared formats (datasets, ONNX I/O, the cut folder). |
+| `docs/FIRST_EXPERIMENTS.md` | The runbook: each area's first experiment as commands to type. |
 
-## The code
+## Tests
 
-| Package | What |
-|---|---|
-| `paths`, `profiles`, `sigmf`, `provenance`, `cards`, `capabilities` | the foundation: rf_data and its write log, receiver profiles and canonical rates, SigMF labels, tiers, model cards (a model without a card does not load) |
-| `dsp` | IQ datatypes, resampling, the front end, the noise floor, CFAR, measurement, impairments, classical denoisers |
-| `cyclo` | FAM/SSCA, cyclic probes (incl. the LTE/NR cyclic-prefix probe), the cyclic proposer, escalation, matched / FRESH / SCORE |
-| `detect` | the class table, detections and box styling, tracker, confirmer, prototypes, ONNX inference, the pipeline |
-| `cut` | the signal cut: cut, analyze, clean, route, save |
-| `synth` | TorchSig 2.2 and native generators, labels, environment profiles, scenes, datasets |
-| `learn` | training (PyTorch, training environment only): proposer, classifier, SSL, calibration, export, the diffusion models |
-| `library` | the training library behind ATK's Setup → RFMLS Training: signal types, real examples, dirty / fresh / AI-generated copies, the dataset builders, the trainers and their plain-words verdicts (2026-10-26) |
-| `experiments` | each track's first experiment, with a report |
-| `repair`, `fingerprint`, `geo`, `text`, `ask`, `hunt`, `cabled`, `sensing`, `hf` | the tracks D, C, E, F, B5, B6, the cabled loop, I and J |
+```
+python -m pytest tests
+```
 
-## Where the rest lives
-
-- **ATK's side** — sub-tabs, the right-click, the subsystem airlock,
-  `rf_data` in the recorder, the hour log, map layers from products — is in
-  ATK itself; what it owes is listed in `D:\Analyst_Toolkit\ATK\FUTURE_PLANS.md`,
-  section dated 2026-10-08.
-- **Palimpsest** (the host-side diffusion loop shared with this repo is its
-  plan §8.6): `D:\Analyst_Toolkit\Palimpsest\PALIMPSEST_PLAN.md`.
-- **Athanor** (spikes S7 and S8 for Palimpsest):
-  `D:\Analyst_Toolkit\Athanor\ATHANOR_PLAN.md`.
-- **Passive radar** inputs are noted in the plan (§4.G) and belong in `atkpr`.
-- **Papers**: `D:\Analyst_Toolkit\new papers\` (+ `additional\`,
-  `additional\more\`), mapped in the plan §9.
+About 1,200 tests, all without a GPU or a radio, in a few minutes.
